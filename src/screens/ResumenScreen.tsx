@@ -21,6 +21,7 @@ type Props = {
   title: string;
   transcript: string;
   summary: string;
+  deberes: string;
   created_at: string;
 };
 
@@ -81,6 +82,12 @@ export default function ResumenScreen() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Resumen</Text>
                 <Markdown style={markdownStyles}>{item.summary}</Markdown>
+              </View>
+            ) : null}
+            {item.deberes ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Deberes</Text>
+                <Markdown style={markdownStyles}>{item.deberes}</Markdown>
               </View>
             ) : null}
           </View>

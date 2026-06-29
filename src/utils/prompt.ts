@@ -29,5 +29,8 @@ export function audio_Prompt() {
       [Aquí la transcripción exacta del audio]
       
       # Resumen
-      [Aquí el resumen académico con puntos clave y conceptos importantes]`;
+      [Aquí el resumen académico con puntos clave y conceptos importantes]
+      
+      # Deberes
+      [Aquí las tareas, actividades, trabajos o deberes mencionados durante la clase. Si no se mencionó ninguno, escribe "No se mencionaron deberes en esta clase."]`;
 }
