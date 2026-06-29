@@ -75,10 +75,16 @@ export default function AudioRecorderScreen() {
         throw new Error("No se pudo realizar el análisis");
       }
 
-      // Separar transcripción y resumen buscando el encabezado "# Resumen"
-      const secciones = generacionResumen.split("# Resumen");
-      const transcripcion = secciones[0].replace("# Transcripción", "").trim();
-      const resumen = secciones.length > 1 ? secciones[1].trim() : "";
+      // Separar transcripción, resumen y deberes usando Regex para mayor robustez
+      // Maneja variaciones como "## Resumen", "#Resumen", "# resumen", o falta de tildes
+      const partesResumen = generacionResumen.split(/(?:#+)\s*Resumen/i);
+      const transcripcion = partesResumen[0].replace(/(?:#+)\s*Transcripci[oó]n/i, "").trim();
+      
+      const textoRestante = partesResumen.length > 1 ? partesResumen[1] : "";
+      const partesDeberes = textoRestante.split(/(?:#+)\s*Deberes/i);
+      
+      const resumen = partesDeberes[0].trim();
+      const deberes = partesDeberes.length > 1 ? partesDeberes[1].trim() : "";
 
       setTextLoading("Guardando en la base de datos...");
 
@@ -91,6 +97,7 @@ export default function AudioRecorderScreen() {
             subject_id: subjectId,
             title: titulo,
             summary: resumen,
+            deberes: deberes,
           },
         ])
         .select()
@@ -101,7 +108,7 @@ export default function AudioRecorderScreen() {
       setTextLoading("Generando embeddings para búsqueda semántica...");
 
       // Generar embeddings para chunks del resumen/transcript
-      const textoEmbedding = `Título: ${titulo}\n\nResumen: ${resumen}\n\nTranscripción: ${transcripcion}`;
+      const textoEmbedding = `Título: ${titulo}\n\nResumen: ${resumen}\n\nDeberes: ${deberes}\n\nTranscripción: ${transcripcion}`;
 
       // Dividimos los chunks en bloques de 1000 caracteres para mejorar el RAG
       const chunks = textoEmbedding.match(/(.|[\r\n]){1,1000}/g) || [
