@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,57 +7,45 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
-} from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import { Send } from "lucide-react-native";
-import { generateText, getEmbedding } from "../lib/gemini";
-import { supabase } from "../lib/supabase";
-import MessageBubble from "../utils/MessageBubble";
-import { COLORS } from "../components/ui/Colors";
-import TypingIndicator from "../utils/burbujaEscribiendo";
-import { chatBot_Prompt } from "../utils/prompt";
+  Alert,
+} from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
+import { Send, Paperclip } from 'lucide-react-native';
+import MessageBubble from '../utils/MessageBubble';
+import { COLORS } from '../components/ui/Colors';
+import TypingIndicator from '../utils/burbujaEscribiendo';
+import { Subject } from '../domain/entities/Subject';
+import { ConversationMessage } from '../domain/entities/ConversationMessage';
+import { ClassContentType } from '../domain/entities/ClassContentType';
+import { askTutorUseCase, listSubjectsUseCase } from '../application/container';
+import { supabase } from '../infrastructure/supabase/supabaseClient';
 
-type Props = {
+type ChatMessage = {
   id: string;
   text: string;
-  sender: "user" | "bot";
+  sender: 'user' | 'bot';
 };
-
-// Decidimos cuantos mensajes guarde para recordare el contexto
-const MAX_HISTORIAL = 5;
-
-// Arma un bloque de texto plano con los últimos mensajes de la charla, para que el modelo entienda a qué se refiere una pregunta de seguimiento
-function construirHistorial(msgs: Props[]) {
-  if (msgs.length === 0) return "";
-  const recientes = msgs.slice(-MAX_HISTORIAL);
-  const lineas = recientes.map(
-    (m) => `${m.sender === "user" ? "Estudiante" : "Tutor"}: ${m.text}`,
-  );
-  return (
-    `Historial reciente de la conversación (es solo para que entiendas el ` +
-    `contexto de la charla; seguí respondiendo ÚNICAMENTE en base a los ` +
-    `apuntes de la materia, no inventes nada por fuera de eso):\n` +
-    `${lineas.join("\n")}\n\n`
-  );
-}
 
 export default function ChatbotScreen() {
   const flatListRef = useRef<FlatList>(null);
 
-  const [messages, setMessages] = useState<Props[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: "1",
-      text: "¡Hola! Soy tu tutor de IA. Por favor, selecciona una materia arriba para que pueda buscar información exacta y actualizada en tus apuntes.",
-      sender: "bot",
+      id: '1',
+      text: '¡Hola! Soy tu tutor de IA. Selecciona una materia para buscar información exacta en tus apuntes.',
+      sender: 'bot',
     },
   ]);
-  const [inputText, setInputText] = useState("");
+  const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
 
-  // States para materias
-  const [materia, setMateria] = useState<any[]>([]);
-  const [materiaId, setMateriaId] = useState<string>("");
+  const [materia, setMateria] = useState<Subject[]>([]);
+  const [materiaId, setMateriaId] = useState<string>('');
+  const [contentType, setContentType] = useState<ClassContentType>('general');
 
   useEffect(() => {
     leerMaterias();
@@ -67,106 +55,133 @@ export default function ChatbotScreen() {
     flatListRef.current?.scrollToEnd({ animated: true });
   }, [messages, loading]);
 
-  // Si cambia la materia seleccionada, arrancamos la charla de nuevo.
   useEffect(() => {
     if (!materiaId) return;
     setMessages([
       {
-        id: "1",
-        text: "¡Listo! Preguntame lo que necesites sobre esta materia.",
-        sender: "bot",
+        id: '1',
+        text: '¡Listo! Pregúntame lo que necesites sobre esta materia. El sistema usará RAG, filtro de privacidad y router de IA.',
+        sender: 'bot',
       },
     ]);
   }, [materiaId]);
 
   async function leerMaterias() {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) return;
-
-      const { data, error } = await supabase
-        .from("subjects")
-        .select("id, name")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      if (data) {
-        setMateria(data);
-        if (data.length > 0) {
-          setMateriaId(data[0].id);
-        }
+      const data = await listSubjectsUseCase.execute();
+      setMateria(data);
+      if (data.length > 0) {
+        setMateriaId(data[0].id);
       }
     } catch (error) {
-      console.error("Error cargando materias:", error);
+      console.error('Error cargando materias:', error);
+    }
+  }
+
+
+  async function adjuntarArchivo() {
+    if (!materiaId) {
+      Alert.alert('Selecciona una materia', 'Primero selecciona una materia para asociar el archivo al chat.');
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'audio/*', 'application/pdf', 'text/*', 'application/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error('No estás autenticado');
+
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+      const safeName = (asset.name || 'archivo').replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const storagePath = `${materiaId}/${Date.now()}_${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(storagePath, decode(base64), {
+          contentType: asset.mimeType || 'application/octet-stream',
+          upsert: false,
+        });
+
+      if (uploadError) throw new Error(uploadError.message);
+
+      await supabase.from('session_files').insert({
+        subject_id: materiaId,
+        uploaded_by: userId,
+        file_name: asset.name || safeName,
+        file_type: (asset.mimeType || '').startsWith('image/')
+          ? 'image'
+          : (asset.mimeType || '').startsWith('audio/')
+            ? 'audio'
+            : (asset.mimeType || '').includes('pdf')
+              ? 'pdf'
+              : 'document',
+        storage_path: storagePath,
+        mime_type: asset.mimeType || null,
+        size_bytes: asset.size || null,
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), text: `Adjunté el archivo: ${asset.name || safeName}`, sender: 'user' },
+        {
+          id: (Date.now() + 1).toString(),
+          text: 'Archivo guardado en Supabase Storage. Puedes usarlo como material de apoyo para esta materia.',
+          sender: 'bot',
+        },
+      ]);
+    } catch (error: any) {
+      Alert.alert('Error al adjuntar', error.message || String(error));
     }
   }
 
   async function enviarMensaje() {
     if (!inputText.trim() || loading) return;
 
-    const userMessage: Props = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       text: inputText.trim(),
-      sender: "user",
+      sender: 'user',
     };
 
-    // Guardamos en el historial el mensaje
-    const historial = construirHistorial(messages);
+    const history: ConversationMessage[] = messages.map((message) => ({
+      id: message.id,
+      text: message.text,
+      sender: message.sender,
+    }));
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputText("");
+    setInputText('');
     setLoading(true);
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) throw new Error("No autenticado");
+      const botResponseText = await askTutorUseCase.execute({
+        question: userMessage.text,
+        subjectId: materiaId,
+        history,
+        contentType,
+      });
 
-      // Generamos la pregunta en embedding
-      const queryEmbedding = await getEmbedding(userMessage.text);
-
-      // Buscamos la similitud
-      const { data: matches, error: rpcError } = await supabase.rpc(
-        "match_audio_embeddings",
-        {
-          query_embedding: `[${queryEmbedding.join(",")}]`,
-          match_threshold: 0.5,
-          match_count: 5,
-          p_user_id: userId,
-          p_subject_id: materiaId,
-        },
-      );
-
-      if (rpcError) throw rpcError;
-
-      // Creamos el prompt para el RAG
-      let contextText = "";
-      if (matches && matches.length > 0) {
-        contextText = matches.map((m: any) => m.content).join("\n\n");
-      }
-
-      // Creamos el prompt con el historial
-      const prompt = `${historial}${chatBot_Prompt(contextText, userMessage.text)}`;
-
-      // Pasamos a gemini para que genere la respuesta
-      const botResponseText = await generateText(prompt);
-
-      const botMessage: Props = {
+      const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        text: botResponseText || "Lo siento, no pude generar una respuesta.",
-        sender: "bot",
+        text: botResponseText || 'Lo siento, no pude generar una respuesta.',
+        sender: 'bot',
       };
       setMessages((prev) => [...prev, botMessage]);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
-          text: "Hubo un error al procesar tu pregunta.",
-          sender: "bot",
+          text: 'Hubo un error al procesar tu pregunta.',
+          sender: 'bot',
         },
       ]);
     } finally {
@@ -176,7 +191,6 @@ export default function ChatbotScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Selector de Materias Obligatorio */}
       <View style={styles.pickerContainer}>
         <Text style={styles.pickerLabel}>Materia:</Text>
         <View style={styles.pickerWrapper}>
@@ -200,7 +214,23 @@ export default function ChatbotScreen() {
         </View>
       </View>
 
-      {/* Input en la parte superior */}
+      <View style={styles.pickerContainerSecondary}>
+        <Text style={styles.pickerLabel}>Ruta IA:</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={contentType}
+            onValueChange={(value) => setContentType(value)}
+            style={styles.picker}
+            dropdownIconColor={COLORS.primary}
+          >
+            <Picker.Item label="General · Google Gemini Flash · mejor para respuestas rápidas" value="general" />
+            <Picker.Item label="Teoría · Google Gemini Flash · mejor para conceptos y resúmenes" value="theory" />
+            <Picker.Item label="Matemática · OpenAI GPT-4.1 Light · mejor para razonamiento paso a paso" value="math" />
+            <Picker.Item label="Imágenes · OpenAI GPT-4.1 Light · mejor para lectura visual" value="image" />
+          </Picker>
+        </View>
+      </View>
+
       <View style={styles.inputWrapper}>
         <View
           style={[
@@ -208,12 +238,19 @@ export default function ChatbotScreen() {
             inputFocused && styles.inputContainerFocused,
           ]}
         >
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={adjuntarArchivo}
+            disabled={!materiaId || loading}
+          >
+            <Paperclip color={materiaId ? COLORS.primary : '#94A3B8'} size={21} />
+          </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder={
               !materiaId
-                ? "Selecciona una materia primero..."
-                : "Escribe tu pregunta aquí..."
+                ? 'Selecciona una materia primero...'
+                : 'Escribe tu pregunta aquí...'
             }
             value={inputText}
             onChangeText={setInputText}
@@ -246,7 +283,6 @@ export default function ChatbotScreen() {
         )}
       </View>
 
-      {/* Chat Area */}
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -272,19 +308,27 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  /* Selector de Materias */
   pickerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.surface,
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  pickerContainerSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
   pickerLabel: {
     fontSize: 15,
-    fontWeight: "bold",
+    fontWeight: 'bold',
     color: COLORS.text,
     marginRight: 10,
   },
@@ -293,36 +337,35 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.inputBg,
     borderRadius: 10,
     height: 40,
-    justifyContent: "center",
-    overflow: "hidden",
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   picker: {
-    width: "100%",
+    width: '100%',
     height: 100,
     color: COLORS.text,
   },
 
-  /* Input Superior */
   inputWrapper: {
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
   },
   inputContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: 10,
     backgroundColor: COLORS.inputBg,
     borderRadius: 26,
     borderWidth: 1.5,
-    borderColor: "transparent",
+    borderColor: 'transparent',
     paddingLeft: 4,
   },
   inputContainerFocused: {
@@ -331,7 +374,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
     borderRadius: 25,
     paddingHorizontal: 14,
     paddingTop: 14,
@@ -341,13 +384,23 @@ const styles = StyleSheet.create({
     minHeight: 52,
     color: COLORS.text,
   },
+  attachButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    marginRight: 6,
+  },
+
   sendButton: {
     backgroundColor: COLORS.primary,
     width: 48,
     height: 48,
     borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     margin: 2,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 3 },
@@ -361,12 +414,11 @@ const styles = StyleSheet.create({
   charCount: {
     fontSize: 11,
     color: COLORS.placeholder,
-    textAlign: "right",
+    textAlign: 'right',
     marginTop: 4,
     marginRight: 4,
   },
 
-  /* Lista de mensajes */
   list: {
     padding: 15,
     paddingTop: 20,

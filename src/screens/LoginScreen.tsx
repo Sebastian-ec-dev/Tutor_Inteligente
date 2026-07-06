@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,135 +6,396 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
-} from "react-native";
-import { supabase } from "../lib/supabase";
-import LoadingModal from "../components/ui/LoadingModal";
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
+import LoadingModal from '../components/ui/LoadingModal';
+import { loginUseCase, registerUseCase } from '../application/container';
+
+type AuthMode = 'welcome' | 'login' | 'register';
+
+const BLUE = '#2563EB';
+const PURPLE = '#7C3AED';
+const BG = '#F8FAFC';
+const TEXT = '#0F172A';
+const MUTED = '#64748B';
+const BORDER = '#E2E8F0';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<AuthMode>('welcome');
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({
+    displayName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    university: '',
+  });
+
+  function goTo(nextMode: AuthMode) {
+    setMode(nextMode);
+    setShowPass(false);
+    setShowConfirmPass(false);
+  }
+
   async function iniciarSesion() {
-    if (email.trim() == "" || password.trim() == "") {
-      Alert.alert("Error", "Llene todos los campos");
-      return;
+    try {
+      setLoading(true);
+      await loginUseCase.execute(loginForm.email, loginForm.password);
+    } catch (error: any) {
+      Alert.alert('Error al iniciar sesión', error.message || String(error));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) Alert.alert("Error", error.message);
-    setLoading(false);
   }
 
   async function crearCuenta() {
-    if (email.trim() == "" || password.trim() == "") {
-      Alert.alert("Error", "Llene todos los campos");
-      return;
-    }
+    try {
+      if (!registerForm.displayName.trim()) {
+        Alert.alert('Validación', 'Ingrese su nombre completo');
+        return;
+      }
 
-    setLoading(true);
+      if (registerForm.password !== registerForm.confirmPassword) {
+        Alert.alert('Validación', 'Las contraseñas no coinciden');
+        return;
+      }
 
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) Alert.alert("Error", error.message);
-    else
+      setLoading(true);
+      await registerUseCase.execute(registerForm.email, registerForm.password, {
+        displayName: registerForm.displayName,
+        university: registerForm.university,
+      });
+
       Alert.alert(
-        "Registro casi completo",
-        "Por favor, revise su correo electrónico para verificar su cuenta.",
+        'Usuario creado',
+        'La cuenta se registró en Supabase Auth. Si tu proyecto exige confirmación de correo, confirma el email antes de iniciar sesión.',
       );
-    setLoading(false);
+      setLoginForm({ email: registerForm.email, password: '' });
+      setRegisterForm({ displayName: '', email: '', password: '', confirmPassword: '', university: '' });
+      goTo('login');
+    } catch (error: any) {
+      Alert.alert('Error al crear usuario', error.message || String(error));
+    } finally {
+      setLoading(false);
+    }
   }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Tutor Inteligente</Text>
-      <Text style={styles.subtitle}>Tu asistente de estudio</Text>
+  function googlePendiente() {
+    Alert.alert(
+      'Google pendiente',
+      'El botón está visible como en el prototipo de Figma Maker, pero todavía no se conectó OAuth de Google en Supabase.',
+    );
+  }
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Correo electrónico"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+  if (mode === 'welcome') {
+    return (
+      <View style={styles.welcomeContainer}>
+        <View style={styles.welcomeHero}>
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoLetter}>A</Text>
+          </View>
+          <Text style={styles.welcomeTitle}>AulaIA</Text>
+          <Text style={styles.welcomeSubtitle}>Tu tutor inteligente por materia</Text>
+        </View>
+
+        <View style={styles.welcomePanel}>
+          <Text style={styles.panelTitle}>Convierte tus clases en conocimiento inteligente</Text>
+          <Text style={styles.panelText}>
+            Graba, transcribe, resume y pregunta a un tutor IA entrenado con tus propias clases.
+          </Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => goTo('login')}>
+            <Text style={styles.primaryButtonText}>Comenzar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.linkButton} onPress={() => goTo('login')}>
+            <Text style={styles.linkButtonText}>Ya tengo cuenta</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+    );
+  }
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={iniciarSesion}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>Iniciar Sesión</Text>
-      </TouchableOpacity>
+  const isLoginMode = mode === 'login';
+  const loginDisabled = loading || !loginForm.email.trim() || !loginForm.password.trim();
+  const registerDisabled =
+    loading ||
+    !registerForm.displayName.trim() ||
+    !registerForm.email.trim() ||
+    !registerForm.password.trim() ||
+    !registerForm.confirmPassword.trim();
 
-      <TouchableOpacity
-        style={[styles.button, styles.buttonOutline]}
-        onPress={crearCuenta}
-        disabled={loading}
-      >
-        <Text style={styles.buttonOutlineText}>Crear Cuenta</Text>
-      </TouchableOpacity>
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity style={styles.backButton} onPress={() => goTo('welcome')} disabled={loading}>
+          <ArrowLeft size={22} color={TEXT} />
+        </TouchableOpacity>
 
+        <Text style={styles.brand}>AulaIA</Text>
+        <Text style={styles.title}>{isLoginMode ? 'Iniciar sesión' : 'Crear cuenta'}</Text>
+        <Text style={styles.subtitle}>
+          {isLoginMode
+            ? 'Accede a tus materias y clases grabadas.'
+            : 'Registra tu perfil académico.'}
+        </Text>
+
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, isLoginMode && styles.tabActive]}
+            onPress={() => goTo('login')}
+            disabled={loading}
+          >
+            <Text style={[styles.tabText, isLoginMode && styles.tabTextActive]}>Iniciar sesión</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, !isLoginMode && styles.tabActive]}
+            onPress={() => goTo('register')}
+            disabled={loading}
+          >
+            <Text style={[styles.tabText, !isLoginMode && styles.tabTextActive]}>Crear usuario</Text>
+          </TouchableOpacity>
+        </View>
+
+        {isLoginMode ? (
+          <View>
+            <FieldLabel text="Correo electrónico" />
+            <TextInput
+              style={styles.input}
+              placeholder="correo@universidad.edu"
+              value={loginForm.email}
+              onChangeText={(email) => setLoginForm((prev) => ({ ...prev, email }))}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!loading}
+            />
+
+            <FieldLabel text="Contraseña" />
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="••••••••"
+                value={loginForm.password}
+                onChangeText={(password) => setLoginForm((prev) => ({ ...prev, password }))}
+                secureTextEntry={!showPass}
+                editable={!loading}
+              />
+              <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPass(!showPass)}>
+                {showPass ? <EyeOff size={18} color={MUTED} /> : <Eye size={18} color={MUTED} />}
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity onPress={() => Alert.alert('Pendiente', 'Primero hay que activar recuperación de contraseña en Supabase Auth.')}>
+              <Text style={styles.forgotText}>Olvidé mi contraseña</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, loginDisabled && styles.disabledButton]}
+              onPress={iniciarSesion}
+              disabled={loginDisabled}
+            >
+              <Text style={styles.primaryButtonText}>Ingresar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.googleButton} onPress={googlePendiente} disabled={loading}>
+              <Text style={styles.googleG}>G</Text>
+              <Text style={styles.googleText}>Continuar con Google</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View>
+            <FieldLabel text="Nombre completo" />
+            <TextInput
+              style={styles.input}
+              placeholder="Mateo Andrade"
+              value={registerForm.displayName}
+              onChangeText={(displayName) => setRegisterForm((prev) => ({ ...prev, displayName }))}
+              editable={!loading}
+            />
+
+            <FieldLabel text="Correo" />
+            <TextInput
+              style={styles.input}
+              placeholder="correo@universidad.edu"
+              value={registerForm.email}
+              onChangeText={(email) => setRegisterForm((prev) => ({ ...prev, email }))}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!loading}
+            />
+
+            <FieldLabel text="Contraseña" />
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Mínimo 6 caracteres"
+                value={registerForm.password}
+                onChangeText={(password) => setRegisterForm((prev) => ({ ...prev, password }))}
+                secureTextEntry={!showPass}
+                editable={!loading}
+              />
+              <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPass(!showPass)}>
+                {showPass ? <EyeOff size={18} color={MUTED} /> : <Eye size={18} color={MUTED} />}
+              </TouchableOpacity>
+            </View>
+
+            <FieldLabel text="Confirmar contraseña" />
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Repite la contraseña"
+                value={registerForm.confirmPassword}
+                onChangeText={(confirmPassword) => setRegisterForm((prev) => ({ ...prev, confirmPassword }))}
+                secureTextEntry={!showConfirmPass}
+                editable={!loading}
+              />
+              <TouchableOpacity style={styles.eyeButton} onPress={() => setShowConfirmPass(!showConfirmPass)}>
+                {showConfirmPass ? <EyeOff size={18} color={MUTED} /> : <Eye size={18} color={MUTED} />}
+              </TouchableOpacity>
+            </View>
+
+            <FieldLabel text="Universidad / Instituto" />
+            <TextInput
+              style={styles.input}
+              placeholder="Universidad Central del Ecuador"
+              value={registerForm.university}
+              onChangeText={(university) => setRegisterForm((prev) => ({ ...prev, university }))}
+              editable={!loading}
+            />
+
+            <TouchableOpacity
+              style={[styles.primaryButton, registerDisabled && styles.disabledButton]}
+              onPress={crearCuenta}
+              disabled={registerDisabled}
+            >
+              <Text style={styles.primaryButtonText}>Crear cuenta</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.termsText}>
+              Al crear una cuenta aceptas el uso responsable de grabaciones académicas.
+            </Text>
+          </View>
+        )}
+      </ScrollView>
       <LoadingModal visible={loading} text="Procesando..." />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
+function FieldLabel({ text }: { text: string }) {
+  return <Text style={styles.label}>{text}</Text>;
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#f5f5f5",
+  welcomeContainer: { flex: 1, backgroundColor: BLUE },
+  welcomeHero: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
+  logoCircle: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 10,
-    color: "#333",
+  logoLetter: { fontSize: 42, fontWeight: '900', color: '#fff' },
+  welcomeTitle: { fontSize: 34, fontWeight: '900', color: '#fff' },
+  welcomeSubtitle: { fontSize: 14, color: '#DBEAFE', marginTop: 4, fontWeight: '600' },
+  welcomePanel: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 30,
   },
-  subtitle: {
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 30,
-    color: "#666",
+  panelTitle: { fontSize: 25, lineHeight: 32, fontWeight: '900', color: TEXT, marginBottom: 12 },
+  panelText: { fontSize: 14, lineHeight: 22, color: MUTED, marginBottom: 24 },
+  container: { flex: 1, backgroundColor: BG },
+  scrollContent: { padding: 24, paddingTop: 48 },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
+    marginBottom: 18,
   },
-  inputContainer: { marginBottom: 20 },
+  brand: { fontSize: 27, fontWeight: '900', color: BLUE, marginBottom: 18 },
+  title: { fontSize: 28, fontWeight: '900', color: TEXT, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: MUTED, marginBottom: 24 },
+  tabsContainer: { flexDirection: 'row', backgroundColor: '#E9EEF8', borderRadius: 16, padding: 4, marginBottom: 22 },
+  tab: { flex: 1, paddingVertical: 12, borderRadius: 13, alignItems: 'center' },
+  tabActive: { backgroundColor: BLUE },
+  tabText: { color: MUTED, fontWeight: '800' },
+  tabTextActive: { color: '#fff' },
+  label: { fontSize: 12, fontWeight: '800', color: MUTED, marginBottom: 7, marginTop: 2 },
   input: {
-    backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    height: 52,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: BORDER,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    fontSize: 14,
+    color: TEXT,
+    marginBottom: 15,
   },
-  button: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  buttonOutline: {
-    backgroundColor: "transparent",
+  passwordWrapper: { position: 'relative', marginBottom: 15 },
+  passwordInput: {
+    height: 52,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#007AFF",
+    borderColor: BORDER,
+    backgroundColor: '#fff',
+    paddingLeft: 16,
+    paddingRight: 48,
+    fontSize: 14,
+    color: TEXT,
   },
-  buttonOutlineText: { color: "#007AFF", fontWeight: "bold", fontSize: 16 },
+  eyeButton: { position: 'absolute', right: 14, top: 16 },
+  forgotText: { textAlign: 'right', color: BLUE, fontWeight: '800', fontSize: 12, marginBottom: 24 },
+  primaryButton: {
+    width: '100%',
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: BLUE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    shadowColor: BLUE,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  disabledButton: { opacity: 0.55 },
+  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  linkButton: { height: 44, alignItems: 'center', justifyContent: 'center' },
+  linkButtonText: { color: BLUE, fontWeight: '900', fontSize: 14 },
+  googleButton: {
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  googleG: { color: PURPLE, fontWeight: '900', fontSize: 18, marginRight: 10 },
+  googleText: { color: TEXT, fontSize: 14, fontWeight: '800' },
+  termsText: { color: MUTED, fontSize: 11, textAlign: 'center', lineHeight: 17, marginTop: 2 },
 });
