@@ -1,0 +1,1 @@
+alter table public.audios add column if not exists deberes text;

@@ -1,4 +1,4 @@
-import { ClassContentType } from './ClassContentType';
+import { ClassContentType } from "./ClassContentType";
 
 export type AudioNote = {
   id: string;
@@ -6,6 +6,7 @@ export type AudioNote = {
   subjectId: string;
   title: string;
   transcript?: string | null;
+  deberes?: string | null;
   summary: string;
   contentType?: ClassContentType;
   createdAt?: string;
@@ -17,6 +18,7 @@ export type NewAudioNote = {
   title: string;
   transcript: string;
   summary: string;
+  deberes?: string;
   contentType: ClassContentType;
 };
 
@@ -25,5 +27,6 @@ export type UpdateAudioNote = {
   title?: string;
   transcript?: string;
   summary?: string;
+  deberes?: string;
   contentType?: ClassContentType;
 };

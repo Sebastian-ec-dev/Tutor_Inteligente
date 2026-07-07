@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,44 +8,54 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { RouteProp, useRoute } from '@react-navigation/native';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import { decode } from 'base64-arraybuffer';
-import { Send, Paperclip } from 'lucide-react-native';
-import MessageBubble from '../utils/MessageBubble';
-import { COLORS } from '../components/ui/Colors';
-import TypingIndicator from '../utils/burbujaEscribiendo';
-import { Subject } from '../domain/entities/Subject';
-import { AudioNote } from '../domain/entities/AudioNote';
-import { ConversationMessage } from '../domain/entities/ConversationMessage';
-import { ClassContentType } from '../domain/entities/ClassContentType';
-import { askTutorUseCase, listAudioNotesUseCase, listSubjectsUseCase } from '../application/container';
-import { supabase } from '../infrastructure/supabase/supabaseClient';
-import { PropsList } from '../navigation/AppNavigator';
+} from "react-native";
+import { Picker } from "@react-native-picker/picker";
+import { RouteProp, useRoute } from "@react-navigation/native";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import { decode } from "base64-arraybuffer";
+import {
+  Send,
+  Paperclip,
+  X,
+  Image as ImageIcon,
+  FileText,
+} from "lucide-react-native";
+import MessageBubble from "../utils/MessageBubble";
+import { COLORS } from "../components/ui/Colors";
+import TypingIndicator from "../utils/burbujaEscribiendo";
+import { Subject } from "../domain/entities/Subject";
+import { AudioNote } from "../domain/entities/AudioNote";
+import { ConversationMessage } from "../domain/entities/ConversationMessage";
+import { ClassContentType } from "../domain/entities/ClassContentType";
+import {
+  askTutorUseCase,
+  listAudioNotesUseCase,
+  listSubjectsUseCase,
+} from "../application/container";
+import { supabase } from "../infrastructure/supabase/supabaseClient";
+import { PropsList } from "../navigation/AppNavigator";
 
 type ChatMessage = {
   id: string;
   text: string;
-  sender: 'user' | 'bot';
+  sender: "user" | "bot";
 };
 
 export default function ChatbotScreen() {
-  const route = useRoute<RouteProp<PropsList, 'Chatbot'>>();
-  const initialSubjectId = route.params?.subjectId || '';
-  const initialClassId = route.params?.classId || '';
+  const route = useRoute<RouteProp<PropsList, "Chatbot">>();
+  const initialSubjectId = route.params?.subjectId || "";
+  const initialClassId = route.params?.classId || "";
   const flatListRef = useRef<FlatList>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: '1',
-      text: '¡Hola! Soy tu tutor de IA. Selecciona una materia y luego una clase/tema para consultar solo ese contenido.',
-      sender: 'bot',
+      id: "1",
+      text: "¡Hola! Soy tu tutor de IA. Selecciona una materia y luego una clase/tema para consultar solo ese contenido.",
+      sender: "bot",
     },
   ]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
 
@@ -53,7 +63,12 @@ export default function ChatbotScreen() {
   const [materiaId, setMateriaId] = useState<string>(initialSubjectId);
   const [clases, setClases] = useState<AudioNote[]>([]);
   const [classId, setClassId] = useState<string>(initialClassId);
-  const [contentType, setContentType] = useState<ClassContentType>('general');
+  const [contentType, setContentType] = useState<ClassContentType>("general");
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    mimeType: string;
+    base64Data: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     leerMaterias();
@@ -66,7 +81,7 @@ export default function ChatbotScreen() {
   useEffect(() => {
     if (!materiaId) {
       setClases([]);
-      setClassId('');
+      setClassId("");
       return;
     }
     leerClases(materiaId);
@@ -78,11 +93,11 @@ export default function ChatbotScreen() {
 
     setMessages([
       {
-        id: '1',
+        id: "1",
         text: selectedClass
           ? `¡Listo! Pregúntame sobre la clase "${selectedClass.title}". El sistema usará solo el resumen y la transcripción de ese tema.`
-          : 'Selecciona una clase/tema de esta materia antes de preguntar. Así el chat no revisará toda la materia.',
-        sender: 'bot',
+          : "Selecciona una clase/tema de esta materia antes de preguntar. Así el chat no revisará toda la materia.",
+        sender: "bot",
       },
     ]);
   }, [classId, clases, materiaId]);
@@ -95,7 +110,7 @@ export default function ChatbotScreen() {
         setMateriaId(data[0].id);
       }
     } catch (error) {
-      console.error('Error cargando materias:', error);
+      console.error("Error cargando materias:", error);
     }
   }
 
@@ -104,30 +119,39 @@ export default function ChatbotScreen() {
       const data = await listAudioNotesUseCase.execute(subjectId);
       setClases(data);
 
-      const initialExists = initialClassId && data.some((item) => item.id === initialClassId);
+      const initialExists =
+        initialClassId && data.some((item) => item.id === initialClassId);
       if (initialExists) {
         setClassId(initialClassId);
         return;
       }
 
-      setClassId(data[0]?.id || '');
+      setClassId(data[0]?.id || "");
     } catch (error) {
-      console.error('Error cargando clases:', error);
+      console.error("Error cargando clases:", error);
       setClases([]);
-      setClassId('');
+      setClassId("");
     }
   }
 
-
   async function adjuntarArchivo() {
     if (!materiaId || !classId) {
-      Alert.alert('Selecciona una clase', 'Primero selecciona la materia y la clase/tema para asociar el archivo al chat.');
+      Alert.alert(
+        "Selecciona una clase",
+        "Primero selecciona la materia y la clase/tema para asociar el archivo al chat.",
+      );
       return;
     }
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'audio/*', 'application/pdf', 'text/*', 'application/*'],
+        type: [
+          "image/*",
+          "audio/*",
+          "application/pdf",
+          "text/*",
+          "application/*",
+        ],
         copyToCacheDirectory: true,
       });
 
@@ -136,63 +160,73 @@ export default function ChatbotScreen() {
       const asset = result.assets[0];
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) throw new Error('No estás autenticado');
+      if (!userId) throw new Error("No estás autenticado");
 
-      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
-      const safeName = (asset.name || 'archivo').replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: "base64",
+      });
+      const safeName = (asset.name || "archivo").replace(
+        /[^a-zA-Z0-9_.-]/g,
+        "_",
+      );
+
+      setPendingAttachment({
+        mimeType: asset.mimeType || "application/octet-stream",
+        base64Data: base64,
+        name: asset.name || safeName,
+      });
+
       const storagePath = `${materiaId}/${classId}/${Date.now()}_${safeName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('chat-uploads')
+        .from("chat-uploads")
         .upload(storagePath, decode(base64), {
-          contentType: asset.mimeType || 'application/octet-stream',
+          contentType: asset.mimeType || "application/octet-stream",
           upsert: false,
         });
 
       if (uploadError) throw new Error(uploadError.message);
 
-      await supabase.from('session_files').insert({
+      await supabase.from("session_files").insert({
         subject_id: materiaId,
         audio_id: classId,
         uploaded_by: userId,
         file_name: asset.name || safeName,
-        file_type: (asset.mimeType || '').startsWith('image/')
-          ? 'image'
-          : (asset.mimeType || '').startsWith('audio/')
-            ? 'audio'
-            : (asset.mimeType || '').includes('pdf')
-              ? 'pdf'
-              : 'document',
+        file_type: (asset.mimeType || "").startsWith("image/")
+          ? "image"
+          : (asset.mimeType || "").startsWith("audio/")
+            ? "audio"
+            : (asset.mimeType || "").includes("pdf")
+              ? "pdf"
+              : "document",
         storage_path: storagePath,
         mime_type: asset.mimeType || null,
         size_bytes: asset.size || null,
       });
-
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now().toString(), text: 'Adjunté un archivo de apoyo para esta clase.', sender: 'user' },
-        {
-          id: (Date.now() + 1).toString(),
-          text: 'Archivo adjuntado correctamente. Quedó asociado a la clase seleccionada.',
-          sender: 'bot',
-        },
-      ]);
     } catch (error: any) {
-      Alert.alert('Error al adjuntar', error.message || String(error));
+      Alert.alert("Error al adjuntar", error.message || String(error));
     }
   }
 
   async function enviarMensaje() {
-    if (!inputText.trim() || loading) return;
+    if (!inputText.trim() && !pendingAttachment) return;
+    if (loading) return;
     if (!materiaId || !classId) {
-      Alert.alert('Selecciona una clase', 'Escoge primero la materia y la clase/tema para que el chat use solo ese contexto.');
+      Alert.alert(
+        "Selecciona una clase",
+        "Escoge primero la materia y la clase/tema para que el chat use solo ese contexto.",
+      );
       return;
     }
 
+    const messageText =
+      inputText.trim() ||
+      (pendingAttachment ? `[Archivo adjunto: ${pendingAttachment.name}]` : "");
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      text: inputText.trim(),
-      sender: 'user',
+      text: messageText,
+      sender: "user",
     };
 
     const history: ConversationMessage[] = messages.map((message) => ({
@@ -202,22 +236,32 @@ export default function ChatbotScreen() {
     }));
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputText('');
+
+    const attachmentToSend = pendingAttachment;
+
+    setInputText("");
+    setPendingAttachment(null);
     setLoading(true);
 
     try {
       const botResponseText = await askTutorUseCase.execute({
-        question: userMessage.text,
+        question: messageText,
         subjectId: materiaId,
         classId,
         history,
         contentType,
+        attachment: attachmentToSend
+          ? {
+              mimeType: attachmentToSend.mimeType,
+              base64Data: attachmentToSend.base64Data,
+            }
+          : undefined,
       });
 
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        text: botResponseText || 'Lo siento, no pude generar una respuesta.',
-        sender: 'bot',
+        text: botResponseText || "Lo siento, no pude generar una respuesta.",
+        sender: "bot",
       };
       setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
@@ -226,8 +270,8 @@ export default function ChatbotScreen() {
         ...prev,
         {
           id: Date.now().toString(),
-          text: 'Hubo un error al procesar tu pregunta.',
-          sender: 'bot',
+          text: "Hubo un error al procesar tu pregunta.",
+          sender: "bot",
         },
       ]);
     } finally {
@@ -292,15 +336,45 @@ export default function ChatbotScreen() {
             style={styles.picker}
             dropdownIconColor={COLORS.primary}
           >
-            <Picker.Item label="General · Google Gemini Flash · mejor para respuestas rápidas" value="general" />
-            <Picker.Item label="Teoría · Google Gemini Flash · mejor para conceptos y resúmenes" value="theory" />
-            <Picker.Item label="Matemática · OpenAI GPT-4.1 Light · mejor para razonamiento paso a paso" value="math" />
-            <Picker.Item label="Imágenes · OpenAI GPT-4.1 Light · mejor para lectura visual" value="image" />
+            <Picker.Item
+              label="General · mejor para respuestas rápidas"
+              value="general"
+            />
+            <Picker.Item
+              label="Teoría · mejor para conceptos y resúmenes"
+              value="theory"
+            />
+            <Picker.Item
+              label="Matemática · mejor para razonamiento paso a paso"
+              value="math"
+            />
+            <Picker.Item
+              label="Imágenes · mejor para lectura visual"
+              value="image"
+            />
           </Picker>
         </View>
       </View>
 
       <View style={styles.inputWrapper}>
+        {pendingAttachment && (
+          <View style={styles.attachmentChip}>
+            {pendingAttachment.mimeType.startsWith("image/") ? (
+              <ImageIcon color={COLORS.primary} size={18} />
+            ) : (
+              <FileText color={COLORS.primary} size={18} />
+            )}
+            <Text style={styles.attachmentName} numberOfLines={1}>
+              {pendingAttachment.name}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setPendingAttachment(null)}
+              style={styles.removeAttachmentButton}
+            >
+              <X color="#EF4444" size={18} />
+            </TouchableOpacity>
+          </View>
+        )}
         <View
           style={[
             styles.inputContainer,
@@ -312,16 +386,21 @@ export default function ChatbotScreen() {
             onPress={adjuntarArchivo}
             disabled={!materiaId || !classId || loading}
           >
-            <Paperclip color={materiaId && classId ? COLORS.primary : '#94A3B8'} size={21} />
+            <Paperclip
+              color={materiaId && classId ? COLORS.primary : "#94A3B8"}
+              size={21}
+            />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder={
               !materiaId
-                ? 'Selecciona una materia primero...'
+                ? "Selecciona una materia primero..."
                 : !classId
-                  ? 'Selecciona una clase/tema primero...'
-                  : 'Escribe tu pregunta aquí...'
+                  ? "Selecciona una clase/tema primero..."
+                  : pendingAttachment
+                    ? "Añade un mensaje a tu archivo..."
+                    : "Escribe tu pregunta aquí..."
             }
             value={inputText}
             onChangeText={setInputText}
@@ -335,11 +414,19 @@ export default function ChatbotScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              (loading || !inputText.trim() || !materiaId || !classId) &&
+              (loading ||
+                (!inputText.trim() && !pendingAttachment) ||
+                !materiaId ||
+                !classId) &&
                 styles.sendButtonDisabled,
             ]}
             onPress={enviarMensaje}
-            disabled={loading || !inputText.trim() || !materiaId || !classId}
+            disabled={
+              loading ||
+              (!inputText.trim() && !pendingAttachment) ||
+              !materiaId ||
+              !classId
+            }
             activeOpacity={0.75}
           >
             {loading ? (
@@ -380,8 +467,8 @@ const styles = StyleSheet.create({
   },
 
   pickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.surface,
     paddingHorizontal: 15,
     paddingVertical: 10,
@@ -389,8 +476,8 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   pickerContainerSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.surface,
     paddingHorizontal: 15,
     paddingVertical: 8,
@@ -399,7 +486,7 @@ const styles = StyleSheet.create({
   },
   pickerLabel: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.text,
     marginRight: 10,
   },
@@ -408,11 +495,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.inputBg,
     borderRadius: 10,
     height: 40,
-    justifyContent: 'center',
-    overflow: 'hidden',
+    justifyContent: "center",
+    overflow: "hidden",
   },
   picker: {
-    width: '100%',
+    width: "100%",
     height: 100,
     color: COLORS.text,
   },
@@ -423,20 +510,41 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
   },
+  attachmentChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+  },
+  attachmentName: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: "600",
+  },
+  removeAttachmentButton: {
+    padding: 4,
+  },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    alignItems: "flex-end",
     gap: 10,
     backgroundColor: COLORS.inputBg,
     borderRadius: 26,
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: "transparent",
     paddingLeft: 4,
   },
   inputContainerFocused: {
@@ -445,7 +553,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 25,
     paddingHorizontal: 14,
     paddingTop: 14,
@@ -459,9 +567,9 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EFF6FF",
     marginRight: 6,
   },
 
@@ -470,8 +578,8 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     margin: 2,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 3 },
@@ -485,7 +593,7 @@ const styles = StyleSheet.create({
   charCount: {
     fontSize: 11,
     color: COLORS.placeholder,
-    textAlign: 'right',
+    textAlign: "right",
     marginTop: 4,
     marginRight: 4,
   },

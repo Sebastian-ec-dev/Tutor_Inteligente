@@ -1,7 +1,10 @@
-import { ClassContentType } from '../../domain/entities/ClassContentType';
-import { AIModelPort } from '../../domain/ports/AIModelPort';
-import { AIModelRouterPort } from '../../domain/ports/AIModelRouterPort';
-import { AIModelCapability, getModelCapabilityByContentType } from '../../domain/entities/AIModelCapability';
+import { ClassContentType } from "../../domain/entities/ClassContentType";
+import { AIModelPort } from "../../domain/ports/AIModelPort";
+import { AIModelRouterPort } from "../../domain/ports/AIModelRouterPort";
+import {
+  AIModelCapability,
+  getModelCapabilityByContentType,
+} from "../../domain/entities/AIModelCapability";
 
 export class AIModelRouter implements AIModelRouterPort {
   constructor(
@@ -10,7 +13,7 @@ export class AIModelRouter implements AIModelRouterPort {
   ) {}
 
   selectModel(contentType: ClassContentType): AIModelPort {
-    if (contentType === 'math' || contentType === 'image') {
+    if (contentType === "math" || contentType === "image") {
       return this.mathAndImageModel;
     }
 

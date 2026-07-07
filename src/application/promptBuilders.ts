@@ -1,20 +1,21 @@
-import { ClassContentType } from '../domain/entities/ClassContentType';
-import { ConversationMessage } from '../domain/entities/ConversationMessage';
+import { ClassContentType } from "../domain/entities/ClassContentType";
+import { ConversationMessage } from "../domain/entities/ConversationMessage";
 
 const MAX_HISTORY = 5;
 
 export function buildConversationHistory(messages: ConversationMessage[]) {
-  if (!messages.length) return '';
+  if (!messages.length) return "";
 
   const recentMessages = messages.slice(-MAX_HISTORY);
   const lines = recentMessages.map(
-    (message) => `${message.sender === 'user' ? 'Estudiante' : 'Tutor'}: ${message.text}`,
+    (message) =>
+      `${message.sender === "user" ? "Estudiante" : "Tutor"}: ${message.text}`,
   );
 
   return (
-    'Historial reciente de la conversación. Úsalo solo para entender preguntas de seguimiento. ' +
-    'La respuesta final debe basarse principalmente en los apuntes guardados como contexto directo.\n' +
-    `${lines.join('\n')}\n\n`
+    "Historial reciente de la conversación. Úsalo solo para entender preguntas de seguimiento. " +
+    "La respuesta final debe basarse principalmente en los apuntes guardados como contexto directo.\n" +
+    `${lines.join("\n")}\n\n`
   );
 }
 
@@ -34,7 +35,7 @@ Reglas:
 
 Contexto de los apuntes:
 """
-${contextText || 'No se encontraron apuntes procesados.'}
+${contextText || "No se encontraron apuntes procesados."}
 """
 
 Pregunta del estudiante:
@@ -56,7 +57,10 @@ Devuelve únicamente la transcripción limpia.
 `;
 }
 
-export function buildClassAnalysisPrompt(content: string, contentType: ClassContentType) {
+export function buildClassAnalysisPrompt(
+  content: string,
+  contentType: ClassContentType,
+) {
   const baseRules = `
 Analiza el siguiente contenido académico y genera apuntes de estudio.
 
@@ -77,7 +81,7 @@ Reglas:
 - Si no hay tareas o fechas, escribe: No se detectaron tareas o fechas de entrega.
 `;
 
-  if (contentType === 'math') {
+  if (contentType === "math") {
     return `${baseRules}
 Ruta IA seleccionada: OpenAI GPT-4.1 mini / modo Light.
 Fortaleza esperada: razonamiento paso a paso, ejercicios matemáticos, fórmulas y explicación de procedimientos.
@@ -88,24 +92,6 @@ Instrucciones específicas:
 - Conserva fórmulas importantes.
 - Señala errores comunes o recomendaciones de resolución.
 - Si hay un ejercicio, presenta el método y no solo la respuesta.
-
-Contenido limpio:
-"""
-${content}
-"""
-`;
-  }
-
-  if (contentType === 'image') {
-    return `${baseRules}
-Ruta IA seleccionada: OpenAI GPT-4.1 mini / modo Light.
-Fortaleza esperada: interpretación visual, ejercicios con imágenes, diagramas y razonamiento escrito.
-
-Tipo de contenido: Contenido con imágenes, diagramas o ejercicios visuales.
-Instrucciones específicas:
-- Explica lo visual de forma textual cuando aplique.
-- Relaciona la imagen con los conceptos de la clase.
-- Si hay ejercicios, explica el procedimiento.
 
 Contenido limpio:
 """
