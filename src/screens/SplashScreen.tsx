@@ -87,7 +87,7 @@ export default function SplashScreen() {
         </View>
         <View style={styles.statusRow}>
           <Database color="#16A34A" size={18} />
-          <Text style={styles.statusText}>Conectando Supabase y RAG</Text>
+          <Text style={styles.statusText}>Conectando Supabase y contexto directo</Text>
         </View>
       </View>
 

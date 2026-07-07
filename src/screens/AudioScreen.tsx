@@ -14,7 +14,7 @@ import { Picker } from '@react-native-picker/picker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PropsList } from '../navigation/AppNavigator';
-import { Upload, CheckCircle, Brain, Mic, Sparkles, Square, Clock } from 'lucide-react-native';
+import { Upload, CheckCircle, Brain, Mic, Sparkles, Square, Clock, Pause, Play } from 'lucide-react-native';
 import LoadingModal from '../components/ui/LoadingModal';
 import { ClassContentType, CLASS_CONTENT_LABELS } from '../domain/entities/ClassContentType';
 import { AI_MODEL_CAPABILITIES, getModelCapabilityByContentType } from '../domain/entities/AIModelCapability';
@@ -35,9 +35,10 @@ const CONTENT_TYPE_OPTIONS: ClassContentType[] = ['theory', 'math', 'image', 'ge
 export default function AudioRecorderScreen() {
   const route = useRoute<RouteProp<PropsList, 'Audio'>>();
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
-  const { subjectId } = route.params;
+  const { subjectId, audioNoteId, audioNoteTitle } = route.params;
+  const isAppendingToClass = !!audioNoteId;
 
-  const [titulo, setTitulo] = useState('');
+  const [titulo, setTitulo] = useState(audioNoteTitle || '');
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [audioName, setAudioName] = useState<string>('');
   const [mimeType, setMimeType] = useState('audio/m4a');
@@ -46,13 +47,14 @@ export default function AudioRecorderScreen() {
   const [textLoading, setTextLoading] = useState<string>('');
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selectedCapability = useMemo(() => getModelCapabilityByContentType(contentType), [contentType]);
 
   useEffect(() => {
-    if (isRecording) {
+    if (isRecording && !isPaused) {
       timerRef.current = setInterval(() => setSeconds((value) => value + 1), 1000);
     } else if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -62,7 +64,7 @@ export default function AudioRecorderScreen() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRecording]);
+  }, [isRecording, isPaused]);
 
   const formatTime = (value: number) => {
     const minutes = Math.floor(value / 60).toString().padStart(2, '0');
@@ -89,6 +91,7 @@ export default function AudioRecorderScreen() {
 
       setRecording(newRecording);
       setIsRecording(true);
+      setIsPaused(false);
       setSeconds(0);
       setAudioUri(null);
       setAudioName('');
@@ -101,6 +104,7 @@ export default function AudioRecorderScreen() {
     try {
       if (!recording) return;
       setIsRecording(false);
+      setIsPaused(false);
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       setRecording(null);
@@ -120,6 +124,26 @@ export default function AudioRecorderScreen() {
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo finalizar la grabación');
+    }
+  }
+
+  async function pausarGrabacion() {
+    try {
+      if (!recording) return;
+      await recording.pauseAsync();
+      setIsPaused(true);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudo pausar la grabación');
+    }
+  }
+
+  async function continuarGrabacion() {
+    try {
+      if (!recording) return;
+      await recording.startAsync();
+      setIsPaused(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudo continuar la grabación');
     }
   }
 
@@ -151,6 +175,7 @@ export default function AudioRecorderScreen() {
       await processAudioNoteUseCase.execute({
         title: titulo,
         subjectId,
+        audioNoteId,
         audioUri: audioUri || '',
         mimeType,
         contentType,
@@ -158,7 +183,9 @@ export default function AudioRecorderScreen() {
       });
       Alert.alert(
         'Éxito',
-        'El apunte fue procesado: transcripción, filtro de privacidad, router IA, resumen, guardado y embeddings RAG.',
+        isAppendingToClass
+          ? 'El audio adicional fue agregado a esta clase y el chat ya consultará el contexto actualizado.'
+          : 'El apunte fue procesado correctamente y quedó listo para revisar y consultar en el chat.',
       );
       navigation.goBack();
     } catch (err: any) {
@@ -176,26 +203,30 @@ export default function AudioRecorderScreen() {
           <Brain color="#fff" size={26} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroTitle}>Procesamiento inteligente</Text>
+          <Text style={styles.heroTitle}>{isAppendingToClass ? 'Agregar audio a la clase' : 'Procesamiento inteligente'}</Text>
           <Text style={styles.heroSubtitle}>
-            La pantalla no llama directo a Gemini, GPT ni Whisper. Solo envía el caso de uso y el router decide el adaptador.
+            {isAppendingToClass
+              ? 'El nuevo audio se unirá a la clase seleccionada. La transcripción, el resumen y el chat se actualizarán solo para este tema.'
+              : 'La pantalla no llama directo a Gemini, GPT ni Whisper. El core procesa el audio y prepara un resumen estructurado para el chat contextual.'}
           </Text>
         </View>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>1. Datos del apunte</Text>
+        <Text style={styles.sectionTitle}>1. Datos de la clase</Text>
 
-        <Text style={styles.label}>Nombre manual del apunte</Text>
+        <Text style={styles.label}>Nombre de la clase/tema</Text>
         <TextInput
           style={styles.input}
-          placeholder="Ej. Normalización - formas normales"
+          placeholder="Ej. Test 1 - Normalización"
           value={titulo}
           onChangeText={setTitulo}
           editable={!loading}
         />
         <Text style={styles.helperText}>
-          Puedes escribir el nombre manualmente. Si lo dejas vacío al seleccionar un archivo, se usará el nombre del audio como base.
+          {isAppendingToClass
+            ? 'Este audio se agregará dentro de la clase seleccionada, sin crear otra tarjeta.'
+            : 'Puedes escribir el nombre manualmente. Si lo dejas vacío, la app generará un título automático con base en el resumen o la transcripción.'}
         </Text>
 
         <Text style={styles.label}>Tipo de contenido académico</Text>
@@ -227,7 +258,7 @@ export default function AudioRecorderScreen() {
           <Text style={styles.selectedModelText}>Uso dentro de la app: {selectedCapability.usedWhen}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>2. Audio base de la clase</Text>
+        <Text style={styles.sectionTitle}>2. Audio de la clase</Text>
         <View style={styles.transcriptionCard}>
           <Mic color={BLUE} size={19} />
           <View style={{ flex: 1 }}>
@@ -242,18 +273,42 @@ export default function AudioRecorderScreen() {
           <View style={styles.recordHeader}>
             <Clock color={isRecording ? '#EF4444' : BLUE} size={18} />
             <Text style={[styles.recordTime, isRecording && styles.recordTimeActive]}>{formatTime(seconds)}</Text>
-            <Text style={styles.recordStatus}>{isRecording ? 'Grabando desde la app...' : 'Listo para grabar'}</Text>
+            <Text style={styles.recordStatus}>{isRecording ? (isPaused ? 'Grabación pausada' : 'Grabando desde la app...') : 'Listo para grabar'}</Text>
           </View>
 
-          <TouchableOpacity
-            style={[styles.actionButton, isRecording ? styles.stopButton : styles.recordStartButton]}
-            onPress={isRecording ? detenerGrabacion : iniciarGrabacion}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {isRecording ? <Square color="#fff" size={20} /> : <Mic color="#fff" size={21} />}
-            <Text style={styles.actionButtonText}>{isRecording ? 'Finalizar grabación' : 'Grabar audio desde la app'}</Text>
-          </TouchableOpacity>
+          {!isRecording ? (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.recordStartButton]}
+              onPress={iniciarGrabacion}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <Mic color="#fff" size={21} />
+              <Text style={styles.actionButtonText}>Grabar audio desde la app</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.recordControlsRow}>
+              <TouchableOpacity
+                style={[styles.smallRecordButton, isPaused ? styles.resumeButton : styles.pauseButton]}
+                onPress={isPaused ? continuarGrabacion : pausarGrabacion}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {isPaused ? <Play color="#fff" size={18} /> : <Pause color="#fff" size={18} />}
+                <Text style={styles.smallRecordButtonText}>{isPaused ? 'Continuar' : 'Pausar'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.smallRecordButton, styles.stopButton]}
+                onPress={detenerGrabacion}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                <Square color="#fff" size={18} />
+                <Text style={styles.smallRecordButtonText}>Guardar segmento</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
@@ -271,7 +326,7 @@ export default function AudioRecorderScreen() {
             <CheckCircle color={GREEN} size={20} />
             <View style={{ flex: 1 }}>
               <Text style={styles.successText}>Audio listo para procesar</Text>
-              <Text style={styles.successSubText} numberOfLines={1}>{audioName || audioUri}</Text>
+              <Text style={styles.successSubText}>El archivo se preparó correctamente.</Text>
             </View>
           </View>
         )}
@@ -290,20 +345,20 @@ export default function AudioRecorderScreen() {
         {env.useMockAI && (
           <View style={styles.mockBox}>
             <Text style={styles.mockTitle}>Modo prueba activo</Text>
-            <Text style={styles.mockText}>EXPO_PUBLIC_USE_MOCK_AI=true. La app simula resumen, transcripción y embeddings sin consumir APIs externas.</Text>
+            <Text style={styles.mockText}>EXPO_PUBLIC_USE_MOCK_AI=true. La app simula resumen, transcripción y chat contextual directo sin consumir APIs externas.</Text>
           </View>
         )}
 
         <TouchableOpacity
           style={[
             styles.submitButton,
-            (!titulo.trim() || !audioUri || loading) && styles.disabledButton,
+            (!audioUri || loading) && styles.disabledButton,
           ]}
           onPress={guardarData}
-          disabled={!titulo.trim() || !audioUri || loading}
+          disabled={!audioUri || loading}
           activeOpacity={0.85}
         >
-          <Text style={styles.submitText}>Procesar y guardar apunte</Text>
+          <Text style={styles.submitText}>{isAppendingToClass ? 'Agregar audio a esta clase' : 'Procesar y guardar clase'}</Text>
         </TouchableOpacity>
       </View>
       <LoadingModal visible={loading} text={textLoading} />
@@ -472,6 +527,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   recordHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  recordControlsRow: { flexDirection: 'row', gap: 10 },
+  smallRecordButton: { flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
+  smallRecordButtonText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  pauseButton: { backgroundColor: ORANGE },
+  resumeButton: { backgroundColor: GREEN },
   recordTime: { color: TEXT, fontWeight: '900', fontSize: 18, fontVariant: ['tabular-nums'] },
   recordTimeActive: { color: '#EF4444' },
   recordStatus: { color: MUTED, fontSize: 12, fontWeight: '800', flex: 1 },

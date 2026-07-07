@@ -13,12 +13,13 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PropsList } from '../navigation/AppNavigator';
-import { BookOpen, Plus, LogOut, MessageSquare, Search, X, Mic, ChevronRight, Brain, UserRound, Pencil, Trash2, Users } from 'lucide-react-native';
+import { BookOpen, Plus, LogOut, MessageSquare, Search, X, Mic, ChevronRight, Brain, UserRound, Pencil, Trash2, Users, QrCode } from 'lucide-react-native';
 import LoadingModal from '../components/ui/LoadingModal';
 import { Subject } from '../domain/entities/Subject';
 import {
   createSubjectUseCase,
   deleteSubjectUseCase,
+  getProfileUseCase,
   listSubjectsUseCase,
   logoutUseCase,
   updateSubjectUseCase,
@@ -58,11 +59,13 @@ export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       leerMaterias();
+      cargarPerfil();
     });
     return unsubscribe;
   }, [navigation]);
@@ -76,6 +79,16 @@ export default function HomeScreen() {
       return values.some((value) => value.toLowerCase().includes(query));
     });
   }, [materias, search]);
+
+  async function cargarPerfil() {
+    try {
+      const profile = await getProfileUseCase.execute();
+      const name = profile.displayName || profile.email?.split('@')[0] || '';
+      setDisplayName(name);
+    } catch (error) {
+      console.log('[HomeScreen] No se pudo cargar el perfil:', error);
+    }
+  }
 
   async function leerMaterias() {
     try {
@@ -148,7 +161,7 @@ export default function HomeScreen() {
   async function eliminarMateria(subject: Subject) {
     Alert.alert(
       'Eliminar materia',
-      `¿Seguro que quieres eliminar "${subject.name}"? También se eliminarán sus apuntes y embeddings relacionados.`,
+      `¿Seguro que quieres eliminar "${subject.name}"? También se eliminarán sus apuntes relacionados.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -204,7 +217,7 @@ export default function HomeScreen() {
           {!!item.description && <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>}
           <View style={styles.badgesRow}>
             <Text style={styles.badgeMuted}>Tutor IA activo</Text>
-            <Text style={styles.badgeBlue}>RAG listo</Text>
+            <Text style={styles.badgeBlue}>Contexto directo</Text>
           </View>
           <View style={styles.cardActionsRow}>
             <TouchableOpacity style={styles.miniActionButton} onPress={(event) => { event.stopPropagation(); abrirEditarMateria(item); }}>
@@ -213,7 +226,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.miniActionButton} onPress={(event) => { event.stopPropagation(); navigation.navigate('Members', { subjectId: item.id, subjectName: item.name }); }}>
               <Users size={13} color={PURPLE} />
-              <Text style={[styles.miniActionText, { color: PURPLE }]}>Amigos</Text>
+              <Text style={[styles.miniActionText, { color: PURPLE }]}>Integrantes</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.miniDangerButton} onPress={(event) => { event.stopPropagation(); eliminarMateria(item); }}>
               <Trash2 size={13} color={RED} />
@@ -232,7 +245,7 @@ export default function HomeScreen() {
       <View style={styles.headerPanel}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.greeting}>Hola 👋</Text>
+            <Text style={styles.greeting}>Hola{displayName ? `, ${displayName}` : ''} 👋</Text>
             <Text style={styles.headerSubtitle}>¿Qué clase quieres estudiar hoy?</Text>
           </View>
           <View style={styles.headerButtons}>
@@ -259,7 +272,7 @@ export default function HomeScreen() {
         <View style={styles.statsGrid}>
           <StatCard value={String(materias.length)} label="Materias" color={BLUE} />
           <StatCard value="IA" label="Router" color={PURPLE} />
-          <StatCard value="RAG" label="Embeddings" color={GREEN} />
+          <StatCard value="CTX" label="Chat directo" color={GREEN} />
           <StatCard value="OK" label="Privacidad" color={ORANGE} />
         </View>
       </View>
@@ -273,6 +286,10 @@ export default function HomeScreen() {
           <MessageSquare color={PURPLE} size={18} />
           <Text style={styles.secondaryActionText}>Tutor IA</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('JoinSubject')}>
+          <QrCode color={PURPLE} size={18} />
+          <Text style={styles.secondaryActionText}>Unirme</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.sectionHeader}>
@@ -284,7 +301,7 @@ export default function HomeScreen() {
         <View style={styles.emptyBox}>
           <BookOpen color={MUTED} size={42} />
           <Text style={styles.emptyTitle}>No hay materias todavía</Text>
-          <Text style={styles.emptyText}>Crea una materia para guardar audios, resúmenes y embeddings por usuario.</Text>
+          <Text style={styles.emptyText}>Crea una materia para guardar audios, resúmenes y chats por usuario.</Text>
           <TouchableOpacity style={styles.emptyButton} onPress={abrirFormulario}>
             <Plus color="#fff" size={18} />
             <Text style={styles.emptyButtonText}>Crear primera materia</Text>

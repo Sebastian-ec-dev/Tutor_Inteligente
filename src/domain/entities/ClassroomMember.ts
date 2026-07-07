@@ -24,6 +24,11 @@ export type ClassroomInvite = {
   role: Exclude<ClassroomRole, 'owner'>;
   status: 'pending' | 'accepted' | 'rejected' | 'expired';
   createdBy: string;
+  token?: string | null;
+  inviteType?: 'email' | 'link' | 'qr';
+  maxUses?: number | null;
+  usesCount?: number | null;
+  expiresAt?: string | null;
   createdAt?: string | null;
 };
 

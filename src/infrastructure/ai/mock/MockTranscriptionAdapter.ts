@@ -2,6 +2,6 @@ import { TranscriptionPort } from '../../../domain/ports/TranscriptionPort';
 
 export class MockTranscriptionAdapter implements TranscriptionPort {
   async transcribeAudio(_input: { base64Audio: string; mimeType: string }): Promise<string> {
-    return 'Transcripción simulada de una clase. El docente explica conceptos principales, ejemplos y recomendaciones de estudio. Si alguien menciona la contraseña es 123456 o un usuario personal, el filtro de privacidad debe reemplazar esa información antes de guardar.';
+    return 'Transcripción simulada de una clase. El docente explica conceptos principales, ejemplos prácticos, tareas posibles y recomendaciones de estudio. La información irrelevante para el aprendizaje se omite antes de guardar.';
   }
 }

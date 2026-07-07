@@ -19,10 +19,14 @@ export class RegexPrivacyFilter implements PrivacyFilterPort {
     let cleanText = text || '';
 
     [...SENSITIVE_PATTERNS, ...INAPPROPRIATE_WORDS].forEach((pattern) => {
-      cleanText = cleanText.replace(pattern, '[DATO SENSIBLE ELIMINADO]');
+      cleanText = cleanText.replace(pattern, '');
     });
 
-    return cleanText;
+    return cleanText
+      .replace(/\[DATO SENSIBLE ELIMINADO\]/gi, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   containsSensitiveData(text: string): boolean {

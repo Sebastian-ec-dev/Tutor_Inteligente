@@ -9,8 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { User, Save, Users, Mail, GraduationCap, BookOpen } from 'lucide-react-native';
+import { User, Save, Users, Mail, GraduationCap, BookOpen, QrCode } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LoadingModal from '../components/ui/LoadingModal';
+import { PropsList } from '../navigation/AppNavigator';
 import { UserProfile } from '../domain/entities/Profile';
 import { SubjectMembership, CLASSROOM_ROLE_LABELS } from '../domain/entities/ClassroomMember';
 import {
@@ -28,6 +31,7 @@ const BORDER = '#E2E8F0';
 const GREEN = '#22C55E';
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [university, setUniversity] = useState('');
@@ -128,6 +132,11 @@ export default function ProfileScreen() {
           Aquí ves las materias compartidas donde participas. Los amigos/integrantes se agregan desde la opción “Integrantes” dentro de cada materia.
         </Text>
 
+        <TouchableOpacity style={styles.joinButton} onPress={() => navigation.navigate('JoinSubject')} activeOpacity={0.85}>
+          <QrCode color="#fff" size={18} />
+          <Text style={styles.joinText}>Unirme con QR o enlace</Text>
+        </TouchableOpacity>
+
         {memberships.length === 0 ? (
           <View style={styles.emptyBox}>
             <BookOpen color={MUTED} size={30} />
@@ -184,6 +193,8 @@ const styles = StyleSheet.create({
   saveButton: { height: 50, borderRadius: 15, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   saveText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   helperText: { color: MUTED, fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  joinButton: { height: 48, borderRadius: 14, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 12 },
+  joinText: { color: '#fff', fontWeight: '900', fontSize: 13 },
   emptyBox: { borderRadius: 16, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, padding: 18, alignItems: 'center' },
   emptyText: { color: MUTED, fontWeight: '700', textAlign: 'center', marginTop: 8 },
   membershipCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: BORDER, borderRadius: 15, marginBottom: 8, backgroundColor: BG },

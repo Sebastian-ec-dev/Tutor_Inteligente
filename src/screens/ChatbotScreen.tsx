@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { RouteProp, useRoute } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
@@ -18,10 +19,12 @@ import MessageBubble from '../utils/MessageBubble';
 import { COLORS } from '../components/ui/Colors';
 import TypingIndicator from '../utils/burbujaEscribiendo';
 import { Subject } from '../domain/entities/Subject';
+import { AudioNote } from '../domain/entities/AudioNote';
 import { ConversationMessage } from '../domain/entities/ConversationMessage';
 import { ClassContentType } from '../domain/entities/ClassContentType';
-import { askTutorUseCase, listSubjectsUseCase } from '../application/container';
+import { askTutorUseCase, listAudioNotesUseCase, listSubjectsUseCase } from '../application/container';
 import { supabase } from '../infrastructure/supabase/supabaseClient';
+import { PropsList } from '../navigation/AppNavigator';
 
 type ChatMessage = {
   id: string;
@@ -30,12 +33,15 @@ type ChatMessage = {
 };
 
 export default function ChatbotScreen() {
+  const route = useRoute<RouteProp<PropsList, 'Chatbot'>>();
+  const initialSubjectId = route.params?.subjectId || '';
+  const initialClassId = route.params?.classId || '';
   const flatListRef = useRef<FlatList>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
-      text: '¡Hola! Soy tu tutor de IA. Selecciona una materia para buscar información exacta en tus apuntes.',
+      text: '¡Hola! Soy tu tutor de IA. Selecciona una materia y luego una clase/tema para consultar solo ese contenido.',
       sender: 'bot',
     },
   ]);
@@ -44,7 +50,9 @@ export default function ChatbotScreen() {
   const [inputFocused, setInputFocused] = useState(false);
 
   const [materia, setMateria] = useState<Subject[]>([]);
-  const [materiaId, setMateriaId] = useState<string>('');
+  const [materiaId, setMateriaId] = useState<string>(initialSubjectId);
+  const [clases, setClases] = useState<AudioNote[]>([]);
+  const [classId, setClassId] = useState<string>(initialClassId);
   const [contentType, setContentType] = useState<ClassContentType>('general');
 
   useEffect(() => {
@@ -56,21 +64,34 @@ export default function ChatbotScreen() {
   }, [messages, loading]);
 
   useEffect(() => {
+    if (!materiaId) {
+      setClases([]);
+      setClassId('');
+      return;
+    }
+    leerClases(materiaId);
+  }, [materiaId]);
+
+  useEffect(() => {
+    const selectedClass = clases.find((item) => item.id === classId);
     if (!materiaId) return;
+
     setMessages([
       {
         id: '1',
-        text: '¡Listo! Pregúntame lo que necesites sobre esta materia. El sistema usará RAG, filtro de privacidad y router de IA.',
+        text: selectedClass
+          ? `¡Listo! Pregúntame sobre la clase "${selectedClass.title}". El sistema usará solo el resumen y la transcripción de ese tema.`
+          : 'Selecciona una clase/tema de esta materia antes de preguntar. Así el chat no revisará toda la materia.',
         sender: 'bot',
       },
     ]);
-  }, [materiaId]);
+  }, [classId, clases, materiaId]);
 
   async function leerMaterias() {
     try {
       const data = await listSubjectsUseCase.execute();
       setMateria(data);
-      if (data.length > 0) {
+      if (!materiaId && data.length > 0) {
         setMateriaId(data[0].id);
       }
     } catch (error) {
@@ -78,10 +99,29 @@ export default function ChatbotScreen() {
     }
   }
 
+  async function leerClases(subjectId: string) {
+    try {
+      const data = await listAudioNotesUseCase.execute(subjectId);
+      setClases(data);
+
+      const initialExists = initialClassId && data.some((item) => item.id === initialClassId);
+      if (initialExists) {
+        setClassId(initialClassId);
+        return;
+      }
+
+      setClassId(data[0]?.id || '');
+    } catch (error) {
+      console.error('Error cargando clases:', error);
+      setClases([]);
+      setClassId('');
+    }
+  }
+
 
   async function adjuntarArchivo() {
-    if (!materiaId) {
-      Alert.alert('Selecciona una materia', 'Primero selecciona una materia para asociar el archivo al chat.');
+    if (!materiaId || !classId) {
+      Alert.alert('Selecciona una clase', 'Primero selecciona la materia y la clase/tema para asociar el archivo al chat.');
       return;
     }
 
@@ -100,7 +140,7 @@ export default function ChatbotScreen() {
 
       const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
       const safeName = (asset.name || 'archivo').replace(/[^a-zA-Z0-9_.-]/g, '_');
-      const storagePath = `${materiaId}/${Date.now()}_${safeName}`;
+      const storagePath = `${materiaId}/${classId}/${Date.now()}_${safeName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('chat-uploads')
@@ -113,6 +153,7 @@ export default function ChatbotScreen() {
 
       await supabase.from('session_files').insert({
         subject_id: materiaId,
+        audio_id: classId,
         uploaded_by: userId,
         file_name: asset.name || safeName,
         file_type: (asset.mimeType || '').startsWith('image/')
@@ -129,10 +170,10 @@ export default function ChatbotScreen() {
 
       setMessages((prev) => [
         ...prev,
-        { id: Date.now().toString(), text: `Adjunté el archivo: ${asset.name || safeName}`, sender: 'user' },
+        { id: Date.now().toString(), text: 'Adjunté un archivo de apoyo para esta clase.', sender: 'user' },
         {
           id: (Date.now() + 1).toString(),
-          text: 'Archivo guardado en Supabase Storage. Puedes usarlo como material de apoyo para esta materia.',
+          text: 'Archivo adjuntado correctamente. Quedó asociado a la clase seleccionada.',
           sender: 'bot',
         },
       ]);
@@ -143,6 +184,10 @@ export default function ChatbotScreen() {
 
   async function enviarMensaje() {
     if (!inputText.trim() || loading) return;
+    if (!materiaId || !classId) {
+      Alert.alert('Selecciona una clase', 'Escoge primero la materia y la clase/tema para que el chat use solo ese contexto.');
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -164,6 +209,7 @@ export default function ChatbotScreen() {
       const botResponseText = await askTutorUseCase.execute({
         question: userMessage.text,
         subjectId: materiaId,
+        classId,
         history,
         contentType,
       });
@@ -215,6 +261,29 @@ export default function ChatbotScreen() {
       </View>
 
       <View style={styles.pickerContainerSecondary}>
+        <Text style={styles.pickerLabel}>Clase:</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={classId}
+            onValueChange={(itemValue) => setClassId(itemValue)}
+            style={styles.picker}
+            dropdownIconColor={COLORS.primary}
+          >
+            {clases.length === 0 && (
+              <Picker.Item
+                label="No hay clases procesadas"
+                value=""
+                color="#999"
+              />
+            )}
+            {clases.map((item) => (
+              <Picker.Item key={item.id} label={item.title} value={item.id} />
+            ))}
+          </Picker>
+        </View>
+      </View>
+
+      <View style={styles.pickerContainerSecondary}>
         <Text style={styles.pickerLabel}>Ruta IA:</Text>
         <View style={styles.pickerWrapper}>
           <Picker
@@ -241,16 +310,18 @@ export default function ChatbotScreen() {
           <TouchableOpacity
             style={styles.attachButton}
             onPress={adjuntarArchivo}
-            disabled={!materiaId || loading}
+            disabled={!materiaId || !classId || loading}
           >
-            <Paperclip color={materiaId ? COLORS.primary : '#94A3B8'} size={21} />
+            <Paperclip color={materiaId && classId ? COLORS.primary : '#94A3B8'} size={21} />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder={
               !materiaId
                 ? 'Selecciona una materia primero...'
-                : 'Escribe tu pregunta aquí...'
+                : !classId
+                  ? 'Selecciona una clase/tema primero...'
+                  : 'Escribe tu pregunta aquí...'
             }
             value={inputText}
             onChangeText={setInputText}
@@ -259,16 +330,16 @@ export default function ChatbotScreen() {
             multiline
             maxLength={600}
             placeholderTextColor={COLORS.placeholder}
-            editable={!!materiaId}
+            editable={!!materiaId && !!classId}
           />
           <TouchableOpacity
             style={[
               styles.sendButton,
-              (loading || !inputText.trim() || !materiaId) &&
+              (loading || !inputText.trim() || !materiaId || !classId) &&
                 styles.sendButtonDisabled,
             ]}
             onPress={enviarMensaje}
-            disabled={loading || !inputText.trim() || !materiaId}
+            disabled={loading || !inputText.trim() || !materiaId || !classId}
             activeOpacity={0.75}
           >
             {loading ? (

@@ -21,19 +21,18 @@ export class MockAIModelAdapter implements AIModelPort {
       `**Modelo seleccionado:** ${this.name}\n\n` +
       `**Tipo de contenido:** ${contentType}\n\n` +
       `## Resumen general\n` +
-      `Este es un resultado de prueba generado sin consumir APIs externas. Sirve para verificar navegación, botones, guardado, filtros de privacidad, embeddings simulados y flujo RAG.\n\n` +
+      `Este es un resultado de prueba generado sin consumir APIs externas. Sirve para verificar navegación, botones, guardado y chat con contexto directo.\n\n` +
       `## Conceptos clave\n` +
       `- Arquitectura hexagonal: las pantallas llaman casos de uso, no servicios externos directamente.\n` +
       `- Router IA: el core selecciona el adaptador según el tipo de contenido.\n` +
-      `- RAG: el resumen y la transcripción se convierten en chunks con embeddings.\n\n` +
+      `- Contexto directo: el resumen y la transcripción guardados se usan como base del chat de la materia.\n\n` +
       `## Puntos importantes\n` +
       `- El flujo puede probarse sin Gemini, OpenAI ni Whisper reales.\n` +
-      `- El filtro de privacidad elimina datos sensibles antes de guardar.\n` +
       `- El audio funciona como base de conocimiento para el chat.\n\n` +
       `## Posibles preguntas de prueba o examen\n` +
       `1. ¿Por qué la arquitectura hexagonal permite cambiar de proveedor de IA sin afectar el core?\n` +
-      `2. ¿Qué función cumplen los embeddings en el chatbot académico?\n` +
-      `3. ¿Por qué se filtran datos sensibles antes de enviar contenido a IA?\n\n` +
+      `2. ¿Por qué el contexto directo simplifica el flujo del chat?\n` +
+      `3. ¿Cómo ayuda el resumen estructurado al estudio?\n\n` +
       `## Tareas detectadas\n` +
       `No se detectaron tareas o fechas de entrega en el modo simulado.\n\n` +
       `## Fecha de entrega detectada\n` +

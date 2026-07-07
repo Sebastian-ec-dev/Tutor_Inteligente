@@ -1,14 +1,9 @@
-import { AudioEmbedding, AudioEmbeddingMatch, AudioNote, NewAudioNote } from '../entities/AudioNote';
+import { AudioNote, NewAudioNote, UpdateAudioNote } from '../entities/AudioNote';
 
 export interface AudioNoteRepositoryPort {
   listBySubject(subjectId: string, userId: string): Promise<AudioNote[]>;
+  getById(audioNoteId: string): Promise<AudioNote | null>;
   saveAudioNote(note: NewAudioNote): Promise<AudioNote>;
-  saveEmbedding(embedding: AudioEmbedding): Promise<void>;
-  searchSimilar(input: {
-    userId: string;
-    subjectId: string;
-    embedding: number[];
-    threshold: number;
-    count: number;
-  }): Promise<AudioEmbeddingMatch[]>;
+  updateAudioNote(note: UpdateAudioNote): Promise<AudioNote>;
+  deleteAudioNote(audioNoteId: string): Promise<void>;
 }

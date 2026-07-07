@@ -13,7 +13,7 @@ export function buildConversationHistory(messages: ConversationMessage[]) {
 
   return (
     'Historial reciente de la conversación. Úsalo solo para entender preguntas de seguimiento. ' +
-    'La respuesta final debe basarse principalmente en los apuntes recuperados.\n' +
+    'La respuesta final debe basarse principalmente en los apuntes guardados como contexto directo.\n' +
     `${lines.join('\n')}\n\n`
   );
 }
@@ -34,7 +34,7 @@ Reglas:
 
 Contexto de los apuntes:
 """
-${contextText || 'No se encontraron fragmentos relevantes.'}
+${contextText || 'No se encontraron apuntes procesados.'}
 """
 
 Pregunta del estudiante:
@@ -47,9 +47,10 @@ export function buildTranscriptionPrompt() {
 Transcribe el audio de la clase de forma clara y ordenada.
 
 Reglas de privacidad:
-- Si escuchas contraseñas, usuarios, correos, números de identificación, teléfonos, claves, insultos o datos personales, reemplázalos por [DATO SENSIBLE ELIMINADO].
+- Si escuchas contraseñas, usuarios, correos, números de identificación, teléfonos, claves, insultos o datos personales, omítelos por completo.
 - No inventes contenido.
 - Mantén solo información útil para el estudio.
+- No escribas avisos como “dato sensible eliminado”, “información bloqueada” o similares.
 
 Devuelve únicamente la transcripción limpia.
 `;
@@ -60,9 +61,10 @@ export function buildClassAnalysisPrompt(content: string, contentType: ClassCont
 Analiza el siguiente contenido académico y genera apuntes de estudio.
 
 Reglas:
-- No incluyas contraseñas, usuarios, correos, teléfonos, identificaciones ni datos personales.
+- No incluyas contraseñas, usuarios, correos, teléfonos, identificaciones ni datos personales. Omite esos fragmentos sin avisarlo.
 - Organiza la respuesta en Markdown.
 - Evita contenido innecesario que fomente la vaguedad; enfócate en aprendizaje y atención.
+- No escribas avisos como “dato sensible eliminado”, “información bloqueada” o similares.
 - Devuelve la información con esta estructura obligatoria:
   # Título del tema
   ## Resumen general

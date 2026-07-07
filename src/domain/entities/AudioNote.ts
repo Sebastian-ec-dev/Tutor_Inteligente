@@ -20,16 +20,10 @@ export type NewAudioNote = {
   contentType: ClassContentType;
 };
 
-export type AudioEmbedding = {
-  userId: string;
-  audioId: string;
-  content: string;
-  embedding: number[];
-};
-
-export type AudioEmbeddingMatch = {
+export type UpdateAudioNote = {
   id: string;
-  audioId: string;
-  content: string;
-  similarity: number;
+  title?: string;
+  transcript?: string;
+  summary?: string;
+  contentType?: ClassContentType;
 };

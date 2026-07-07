@@ -34,7 +34,7 @@ export const AI_MODEL_CAPABILITIES: AIModelCapability[] = [
     provider: 'OpenAI',
     modelName: 'Whisper / transcriptor de audio',
     routeLabel: 'Ruta de transcripción',
-    bestFor: 'convertir grabaciones de clase en texto limpio para que luego el core genere resúmenes, tareas y embeddings.',
+    bestFor: 'convertir grabaciones de clase en texto limpio para que luego el core genere resúmenes, tareas y contexto directo para el chat.',
     usedWhen: 'Se usa en la etapa de audio antes del análisis académico.',
   },
   {
@@ -42,7 +42,7 @@ export const AI_MODEL_CAPABILITIES: AIModelCapability[] = [
     provider: 'Local',
     modelName: 'Mock AI',
     routeLabel: 'Ruta de pruebas sin API',
-    bestFor: 'probar navegación, botones, guardado, resumen simulado, embeddings simulados y RAG sin consumir claves externas.',
+    bestFor: 'probar navegación, botones, guardado, resumen simulado y chat con contexto directo sin consumir claves externas.',
     usedWhen: 'Se activa con EXPO_PUBLIC_USE_MOCK_AI=true.',
   },
 ];

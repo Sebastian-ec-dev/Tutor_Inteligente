@@ -8,12 +8,10 @@ import { SupabaseClassroomMemberRepository } from '../infrastructure/supabase/Su
 
 import { GeminiAIModelAdapter } from '../infrastructure/ai/GeminiAIModelAdapter';
 import { GptMathAIModelAdapter } from '../infrastructure/ai/GptMathAIModelAdapter';
-import { GeminiEmbeddingAdapter } from '../infrastructure/ai/GeminiEmbeddingAdapter';
 import { GeminiAudioTranscriptionAdapter } from '../infrastructure/ai/GeminiAudioTranscriptionAdapter';
 import { WhisperTranscriptionAdapter } from '../infrastructure/ai/WhisperTranscriptionAdapter';
 import { AIModelRouter } from '../infrastructure/ai/AIModelRouter';
 import { MockAIModelAdapter } from '../infrastructure/ai/mock/MockAIModelAdapter';
-import { MockEmbeddingAdapter } from '../infrastructure/ai/mock/MockEmbeddingAdapter';
 import { MockTranscriptionAdapter } from '../infrastructure/ai/mock/MockTranscriptionAdapter';
 
 import { RegexPrivacyFilter } from '../infrastructure/privacy/RegexPrivacyFilter';
@@ -30,6 +28,8 @@ import { UpdateSubjectUseCase } from './usecases/subjects/UpdateSubjectUseCase';
 import { DeleteSubjectUseCase } from './usecases/subjects/DeleteSubjectUseCase';
 import { ListAudioNotesUseCase } from './usecases/audio/ListAudioNotesUseCase';
 import { ProcessAudioNoteUseCase } from './usecases/audio/ProcessAudioNoteUseCase';
+import { UpdateAudioNoteUseCase } from './usecases/audio/UpdateAudioNoteUseCase';
+import { DeleteAudioNoteUseCase } from './usecases/audio/DeleteAudioNoteUseCase';
 import { AskTutorUseCase } from './usecases/chat/AskTutorUseCase';
 import { GetProfileUseCase } from './usecases/profile/GetProfileUseCase';
 import { UpdateProfileUseCase } from './usecases/profile/UpdateProfileUseCase';
@@ -37,6 +37,10 @@ import { ListClassroomMembersUseCase } from './usecases/classroom/ListClassroomM
 import { InviteClassroomMemberUseCase } from './usecases/classroom/InviteClassroomMemberUseCase';
 import { UpdateClassroomMemberRoleUseCase } from './usecases/classroom/UpdateClassroomMemberRoleUseCase';
 import { ListMyMembershipsUseCase } from './usecases/classroom/ListMyMembershipsUseCase';
+import { CreateJoinInviteUseCase } from './usecases/classroom/CreateJoinInviteUseCase';
+import { JoinSubjectByTokenUseCase } from './usecases/classroom/JoinSubjectByTokenUseCase';
+import { RemoveClassroomMemberUseCase } from './usecases/classroom/RemoveClassroomMemberUseCase';
+import { DeleteClassroomInviteUseCase } from './usecases/classroom/DeleteClassroomInviteUseCase';
 
 const authRepository = new SupabaseAuthRepository();
 const subjectRepository = new SupabaseSubjectRepository();
@@ -57,9 +61,6 @@ const gptMathModel = env.useMockAI
 
 const modelRouter = new AIModelRouter(geminiTheoryModel, gptMathModel);
 
-const embeddingService = env.useMockAI
-  ? new MockEmbeddingAdapter()
-  : new GeminiEmbeddingAdapter();
 
 const geminiTranscriptionFallback = new GeminiAudioTranscriptionAdapter(geminiTheoryModel);
 
@@ -84,21 +85,25 @@ export const listClassroomMembersUseCase = new ListClassroomMembersUseCase(class
 export const inviteClassroomMemberUseCase = new InviteClassroomMemberUseCase(authRepository, classroomMemberRepository);
 export const updateClassroomMemberRoleUseCase = new UpdateClassroomMemberRoleUseCase(classroomMemberRepository);
 export const listMyMembershipsUseCase = new ListMyMembershipsUseCase(authRepository, classroomMemberRepository);
+export const createJoinInviteUseCase = new CreateJoinInviteUseCase(authRepository, classroomMemberRepository);
+export const joinSubjectByTokenUseCase = new JoinSubjectByTokenUseCase(classroomMemberRepository);
+export const removeClassroomMemberUseCase = new RemoveClassroomMemberUseCase(classroomMemberRepository);
+export const deleteClassroomInviteUseCase = new DeleteClassroomInviteUseCase(classroomMemberRepository);
 
 export const listAudioNotesUseCase = new ListAudioNotesUseCase(authRepository, audioNoteRepository);
+export const updateAudioNoteUseCase = new UpdateAudioNoteUseCase(audioNoteRepository);
+export const deleteAudioNoteUseCase = new DeleteAudioNoteUseCase(audioNoteRepository);
 export const processAudioNoteUseCase = new ProcessAudioNoteUseCase(
   authRepository,
   fileReader,
   transcriber,
   privacyFilter,
   modelRouter,
-  embeddingService,
   audioNoteRepository,
 );
 
 export const askTutorUseCase = new AskTutorUseCase(
   authRepository,
-  embeddingService,
   audioNoteRepository,
   privacyFilter,
   modelRouter,

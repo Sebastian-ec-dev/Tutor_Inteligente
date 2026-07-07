@@ -12,15 +12,17 @@ import ChatbotScreen from '../screens/ChatbotScreen';
 import SplashScreen from '../screens/SplashScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import MembersScreen from '../screens/MembersScreen';
+import JoinSubjectScreen from '../screens/JoinSubjectScreen';
 
 export type PropsList = {
   Login: undefined;
   Home: undefined;
   Resumen: { subjectId: string; subjectName: string };
-  Audio: { subjectId: string };
-  Chatbot: undefined;
+  Audio: { subjectId: string; audioNoteId?: string; audioNoteTitle?: string };
+  Chatbot: { subjectId?: string; subjectName?: string; classId?: string; className?: string } | undefined;
   Profile: undefined;
   Members: { subjectId: string; subjectName: string };
+  JoinSubject: undefined;
 };
 
 const Stack = createNativeStackNavigator<PropsList>();
@@ -97,6 +99,11 @@ export default function AppNavigator() {
               name="Members"
               component={MembersScreen}
               options={({ route }) => ({ title: `Integrantes · ${route.params.subjectName}` })}
+            />
+            <Stack.Screen
+              name="JoinSubject"
+              component={JoinSubjectScreen}
+              options={{ title: 'Unirme a materia' }}
             />
           </>
         ) : (
