@@ -227,6 +227,12 @@ export default function ResumenScreen() {
                 )}
               </View>
             ) : null}
+            {item.deberes ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Deberes</Text>
+                <Markdown style={markdownStyles}>{item.deberes}</Markdown>
+              </View>
+            ) : null}
           </View>
         )}
       </View>
