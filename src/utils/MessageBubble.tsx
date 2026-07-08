@@ -18,8 +18,14 @@ export default function MessageBubble({
   item: Props;
   isLastInGroup: boolean;
 }) {
-  const fade = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(10)).current;
+  const fadeRef = useRef<Animated.Value | null>(null);
+  const slideRef = useRef<Animated.Value | null>(null);
+
+  if (!fadeRef.current) fadeRef.current = new Animated.Value(0);
+  if (!slideRef.current) slideRef.current = new Animated.Value(10);
+
+  const fade = fadeRef.current;
+  const slide = slideRef.current;
 
   useEffect(() => {
     Animated.parallel([
@@ -34,7 +40,7 @@ export default function MessageBubble({
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fade, slide]);
 
   const isUser = item.sender === "user";
   const time = formateoTime(item.id);
@@ -156,16 +162,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.12)",
   },
   avatarHidden: {
     backgroundColor: "transparent",
-    shadowOpacity: 0,
-    elevation: 0,
+    boxShadow: "none",
   },
   userAvatarPlaceholder: {
     backgroundColor: COLORS.userAvatarBg,
@@ -178,11 +179,7 @@ const styles = StyleSheet.create({
     padding: 14,
     paddingHorizontal: 16,
     borderRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.08)",
   },
   userBubble: {
     backgroundColor: COLORS.primary,

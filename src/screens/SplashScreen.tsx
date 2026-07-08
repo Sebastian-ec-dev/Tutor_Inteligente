@@ -10,12 +10,20 @@ const MUTED = '#64748B';
 const BORDER = '#DBEAFE';
 
 export default function SplashScreen() {
-  const scale = useRef(new Animated.Value(0.92)).current;
-  const opacity = useRef(new Animated.Value(0.35)).current;
-  const progress = useRef(new Animated.Value(0)).current;
+  const scaleRef = useRef<Animated.Value | null>(null);
+  const opacityRef = useRef<Animated.Value | null>(null);
+  const progressRef = useRef<Animated.Value | null>(null);
+
+  if (!scaleRef.current) scaleRef.current = new Animated.Value(0.92);
+  if (!opacityRef.current) opacityRef.current = new Animated.Value(0.35);
+  if (!progressRef.current) progressRef.current = new Animated.Value(0);
+
+  const scale = scaleRef.current;
+  const opacity = opacityRef.current;
+  const progress = progressRef.current;
 
   useEffect(() => {
-    Animated.loop(
+    const pulse = Animated.loop(
       Animated.sequence([
         Animated.parallel([
           Animated.timing(scale, {
@@ -46,14 +54,22 @@ export default function SplashScreen() {
           }),
         ]),
       ]),
-    ).start();
+    );
 
-    Animated.timing(progress, {
+    const progressAnimation = Animated.timing(progress, {
       toValue: 1,
       duration: 3000,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-    }).start();
+    });
+
+    pulse.start();
+    progressAnimation.start();
+
+    return () => {
+      pulse.stop();
+      progressAnimation.stop();
+    };
   }, [opacity, progress, scale]);
 
   const width = progress.interpolate({
@@ -127,10 +143,7 @@ const styles = StyleSheet.create({
     backgroundColor: BLUE,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: BLUE,
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 5,
+    boxShadow: '0px 6px 14px rgba(37, 99, 235, 0.28)',
   },
   title: {
     color: TEXT,

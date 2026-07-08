@@ -2,7 +2,7 @@ import { ClassContentType } from './ClassContentType';
 
 export type AudioNote = {
   id: string;
-  userId: string;
+  userId?: string;
   subjectId: string;
   title: string;
   transcript?: string | null;
@@ -12,7 +12,7 @@ export type AudioNote = {
 };
 
 export type NewAudioNote = {
-  userId: string;
+  userId?: string;
   subjectId: string;
   title: string;
   transcript: string;

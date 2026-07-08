@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   View,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
@@ -67,12 +67,7 @@ export default function MembersScreen() {
     return buildSubjectInviteLink(joinInvite.token);
   }, [joinInvite]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', cargarIntegrantes);
-    return unsubscribe;
-  }, [navigation]);
-
-  async function cargarIntegrantes() {
+  const cargarIntegrantes = useCallback(async () => {
     try {
       setLoading(true);
       const data = await listClassroomMembersUseCase.execute(subjectId);
@@ -86,7 +81,15 @@ export default function MembersScreen() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [subjectId]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', cargarIntegrantes);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [navigation, cargarIntegrantes]);
 
   async function enviarInvitacion() {
     try {
@@ -139,12 +142,12 @@ export default function MembersScreen() {
   }
 
   async function cambiarRol(member: ClassroomMember, nextRole: Exclude<ClassroomRole, 'owner'>) {
-    if (member.role === 'owner') return;
+    if (member.memberRole === 'owner') return;
     try {
       setLoading(true);
       await updateClassroomMemberRoleUseCase.execute({
         subjectId,
-        memberUserId: member.userId,
+        memberUserId: member.accountId,
         role: nextRole,
       });
       await cargarIntegrantes();
@@ -156,7 +159,7 @@ export default function MembersScreen() {
   }
 
   async function eliminarIntegrante(member: ClassroomMember) {
-    if (member.role === 'owner') {
+    if (member.memberRole === 'owner') {
       Alert.alert('Acción no permitida', 'No se puede eliminar al creador del aula.');
       return;
     }
@@ -169,7 +172,7 @@ export default function MembersScreen() {
         onPress: async () => {
           try {
             setLoading(true);
-            await removeClassroomMemberUseCase.execute({ subjectId, memberUserId: member.userId });
+            await removeClassroomMemberUseCase.execute({ subjectId, memberUserId: member.accountId });
             await cargarIntegrantes();
           } catch (error: any) {
             Alert.alert('Error', error.message || String(error));
@@ -216,18 +219,18 @@ export default function MembersScreen() {
       </View>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.inviteButton} onPress={() => setModalVisible(true)} activeOpacity={0.85}>
+        <Pressable style={styles.inviteButton} onPress={() => setModalVisible(true)}>
           <MailPlus color="#fff" size={18} />
           <Text style={styles.inviteText}>Agregar estudiante</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.outlineButton} onPress={generarQrOEnlace} activeOpacity={0.85}>
+        </Pressable>
+        <Pressable style={styles.outlineButton} onPress={generarQrOEnlace}>
           <QrCode color={PURPLE} size={18} />
           <Text style={styles.outlineText}>QR</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.outlineButton} onPress={compartirEnlace} activeOpacity={0.85}>
+        </Pressable>
+        <Pressable style={styles.outlineButton} onPress={compartirEnlace}>
           <Share2 color={PURPLE} size={18} />
           <Text style={styles.outlineText}>Enlace</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <Text style={styles.sectionTitle}>Miembros del aula</Text>
@@ -243,21 +246,21 @@ export default function MembersScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.memberName}>{item.displayName || item.email || 'Usuario registrado'}</Text>
-              <Text style={styles.memberEmail}>{item.email || item.userId}</Text>
-              <Text style={styles.roleBadge}>{CLASSROOM_ROLE_LABELS[item.role]}</Text>
+              <Text style={styles.memberEmail}>{item.email || item.accountId}</Text>
+              <Text style={styles.roleBadge}>{CLASSROOM_ROLE_LABELS[item.memberRole]}</Text>
             </View>
-            {item.role !== 'owner' && (
+            {item.memberRole !== 'owner' && (
               <View style={styles.memberActions}>
                 <View style={styles.rolePickerWrapper}>
-                  <Picker selectedValue={item.role} onValueChange={(value) => cambiarRol(item, value)} style={styles.rolePicker}>
+                  <Picker selectedValue={item.memberRole} onValueChange={(value) => cambiarRol(item, value)} style={styles.rolePicker}>
                     {ROLE_OPTIONS.map((r) => (
                       <Picker.Item key={r} label={CLASSROOM_ROLE_LABELS[r]} value={r} />
                     ))}
                   </Picker>
                 </View>
-                <TouchableOpacity style={styles.deleteMemberButton} onPress={() => eliminarIntegrante(item)}>
+                <Pressable style={styles.deleteMemberButton} onPress={() => eliminarIntegrante(item)}>
                   <Trash2 color={RED} size={17} />
-                </TouchableOpacity>
+                </Pressable>
               </View>
             )}
           </View>
@@ -278,9 +281,9 @@ export default function MembersScreen() {
                   {invite.maxUses ? ` · ${invite.usesCount || 0}/${invite.maxUses} usos` : ''}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.deleteInviteButton} onPress={() => eliminarInvitacion(invite)}>
+              <Pressable style={styles.deleteInviteButton} onPress={() => eliminarInvitacion(invite)}>
                 <Trash2 color={RED} size={16} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
           ))
         )}
@@ -294,9 +297,9 @@ export default function MembersScreen() {
                 <Text style={styles.modalTitle}>Agregar estudiante</Text>
                 <Text style={styles.modalSubtitle}>Invita por correo y asigna su rol.</Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+              <Pressable style={styles.closeButton} onPress={() => setModalVisible(false)}>
                 <X size={20} color={TEXT} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <Text style={styles.label}>Correo del invitado</Text>
@@ -319,9 +322,9 @@ export default function MembersScreen() {
               </Picker>
             </View>
 
-            <TouchableOpacity style={styles.createButton} onPress={enviarInvitacion} activeOpacity={0.85}>
+            <Pressable style={styles.createButton} onPress={enviarInvitacion}>
               <Text style={styles.createButtonText}>Guardar invitación</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -334,9 +337,9 @@ export default function MembersScreen() {
                 <Text style={styles.modalTitle}>QR para unirse</Text>
                 <Text style={styles.modalSubtitle}>Los estudiantes se unirán como Estudiante.</Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setQrVisible(false)}>
+              <Pressable style={styles.closeButton} onPress={() => setQrVisible(false)}>
                 <X size={20} color={TEXT} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             {joinLink ? (
@@ -346,10 +349,10 @@ export default function MembersScreen() {
             ) : null}
             <Text style={styles.linkText}>{joinLink || 'Generando enlace...'}</Text>
 
-            <TouchableOpacity style={styles.createButton} onPress={compartirEnlace} activeOpacity={0.85}>
+            <Pressable style={styles.createButton} onPress={compartirEnlace}>
               <Share2 color="#fff" size={18} />
               <Text style={styles.createButtonText}>Compartir enlace</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       </Modal>

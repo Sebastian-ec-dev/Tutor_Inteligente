@@ -47,7 +47,6 @@ export class SupabaseAudioNoteRepository implements AudioNoteRepositoryPort {
       .from(AUDIOS_TABLE)
       .insert([
         {
-          user_id: note.userId,
           subject_id: note.subjectId,
           title: note.title,
           transcript: note.transcript,

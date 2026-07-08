@@ -26,10 +26,9 @@ export class CreateSubjectUseCase {
       throw new Error('Ingrese el nombre de la materia');
     }
 
-    const userId = await this.authRepository.getCurrentUserId();
+    await this.authRepository.getCurrentUserId();
     return this.subjectRepository.create({
       name: cleanName,
-      userId,
       teacher: form.teacher?.trim() || undefined,
       description: form.description?.trim() || undefined,
       color: form.color || '#2563EB',

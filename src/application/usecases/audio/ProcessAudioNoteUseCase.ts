@@ -32,7 +32,7 @@ export class ProcessAudioNoteUseCase {
     if (!input.subjectId) throw new Error('Selecciona una materia para guardar el apunte');
     if (!input.audioUri) throw new Error('No hay audio para procesar');
 
-    const userId = await this.authRepository.getCurrentUserId();
+    await this.authRepository.getCurrentUserId();
 
     input.onProgress?.('Leyendo archivo de audio...');
     const base64Audio = await this.fileReader.readAsBase64(input.audioUri);
@@ -92,7 +92,6 @@ export class ProcessAudioNoteUseCase {
 
     input.onProgress?.('Guardando clase/apunte procesado...');
     const audioNote = await this.audioNoteRepository.saveAudioNote({
-      userId,
       subjectId: input.subjectId,
       title: finalTitle,
       transcript: cleanTranscript,

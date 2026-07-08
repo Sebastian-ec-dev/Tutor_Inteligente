@@ -10,8 +10,8 @@ export const CLASSROOM_ROLE_LABELS: Record<ClassroomRole, string> = {
 export type ClassroomMember = {
   id: string;
   subjectId: string;
-  userId: string;
-  role: ClassroomRole;
+  accountId: string;
+  memberRole: ClassroomRole;
   email?: string | null;
   displayName?: string | null;
   createdAt?: string | null;

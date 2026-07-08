@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   View,
   Switch,
 } from 'react-native';
@@ -133,10 +133,10 @@ export default function ProfileScreen() {
           <Text style={styles.infoText}>{profile?.email || 'correo no encontrado'}</Text>
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={guardarPerfil} activeOpacity={0.85}>
+        <Pressable style={styles.saveButton} onPress={guardarPerfil}>
           <Save color="#fff" size={18} />
           <Text style={styles.saveText}>Guardar cambios</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -170,10 +170,10 @@ export default function ProfileScreen() {
           Aquí ves las materias compartidas donde participas. Los amigos/integrantes se agregan desde la opción “Integrantes” dentro de cada materia.
         </Text>
 
-        <TouchableOpacity style={styles.joinButton} onPress={() => navigation.navigate('JoinSubject')} activeOpacity={0.85}>
+        <Pressable style={styles.joinButton} onPress={() => navigation.navigate('JoinSubject')}>
           <QrCode color="#fff" size={18} />
           <Text style={styles.joinText}>Unirme con QR o enlace</Text>
-        </TouchableOpacity>
+        </Pressable>
 
         {memberships.length === 0 ? (
           <View style={styles.emptyBox}>

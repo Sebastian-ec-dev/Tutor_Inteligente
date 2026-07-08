@@ -69,10 +69,12 @@ export class GptMathAIModelAdapter implements AIModelPort {
     if (typeof outputText === 'string') return outputText;
 
     const content = data.output?.flatMap((item: any) => item.content || []) || [];
-    const textParts = content
-      .filter((item: any) => item.type === 'output_text' || item.type === 'text')
-      .map((item: any) => item.text || '')
-      .join('\n');
+    const textParts = content.reduce((acc: string[], item: any) => {
+      if (item.type === 'output_text' || item.type === 'text') {
+        acc.push(item.text || '');
+      }
+      return acc;
+    }, []).join('\n');
 
     return textParts || '';
   }

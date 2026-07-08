@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   View,
 } from 'react-native';
 // @ts-ignore - instalar con: npx expo install expo-camera
@@ -29,7 +29,7 @@ export default function JoinSubjectScreen() {
   const [scanMode, setScanMode] = useState(false);
   const [tokenOrLink, setTokenOrLink] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [scanned, setScanned] = useState(false);
+  const scannedRef = useRef(false);
 
   async function joinWithValue(value: string) {
     if (processing) return;
@@ -40,7 +40,7 @@ export default function JoinSubjectScreen() {
       navigation.navigate('Home');
     } catch (error: any) {
       Alert.alert('Error', error.message || String(error));
-      setScanned(false);
+      scannedRef.current = false;
     } finally {
       setProcessing(false);
     }
@@ -54,13 +54,13 @@ export default function JoinSubjectScreen() {
         return;
       }
     }
-    setScanned(false);
+    scannedRef.current = false;
     setScanMode(true);
   }
 
   function handleBarcodeScanned(event: { data: string }) {
-    if (scanned || processing) return;
-    setScanned(true);
+    if (scannedRef.current || processing) return;
+    scannedRef.current = true;
     setScanMode(false);
     joinWithValue(event.data);
   }
@@ -78,9 +78,9 @@ export default function JoinSubjectScreen() {
           <QrCode color="#fff" size={34} />
           <Text style={styles.scanTitle}>Escanea el QR del aula</Text>
           <Text style={styles.scanText}>Apunta la cámara al código generado por el creador o administrador.</Text>
-          <TouchableOpacity style={styles.cancelButton} onPress={() => setScanMode(false)}>
+          <Pressable style={styles.cancelButton} onPress={() => setScanMode(false)}>
             <Text style={styles.cancelText}>Cancelar</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     );
@@ -99,10 +99,10 @@ export default function JoinSubjectScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.scanButton} onPress={openScanner} activeOpacity={0.85}>
+      <Pressable style={styles.scanButton} onPress={openScanner}>
         <Camera color="#fff" size={20} />
         <Text style={styles.scanButtonText}>Escanear QR</Text>
-      </TouchableOpacity>
+      </Pressable>
 
       <View style={styles.card}>
         <View style={styles.cardTitleRow}>
@@ -118,14 +118,13 @@ export default function JoinSubjectScreen() {
           onChangeText={setTokenOrLink}
           autoCapitalize="none"
         />
-        <TouchableOpacity
+        <Pressable
           style={[styles.joinButton, (!tokenOrLink.trim() || processing) && styles.disabledButton]}
           disabled={!tokenOrLink.trim() || processing}
           onPress={() => joinWithValue(tokenOrLink)}
-          activeOpacity={0.85}
         >
           <Text style={styles.joinButtonText}>{processing ? 'Uniendo...' : 'Unirme al aula'}</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
       </View>
       <AppBottomBar activeTab="Materias" />

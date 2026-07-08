@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -19,8 +19,7 @@ import LoadingModal from '../components/ui/LoadingModal';
 import AppBottomBar from '../components/ui/AppBottomBar';
 import { useAppTheme } from '../components/ui/ThemeContext';
 import { ClassContentType, CLASS_CONTENT_LABELS } from '../domain/entities/ClassContentType';
-import { AIProvider, AI_PROVIDER_LABELS } from '../domain/entities/AIProvider';
-import { AI_MODEL_CAPABILITIES, getModelCapabilityByContentType } from '../domain/entities/AIModelCapability';
+import { getModelCapabilityByContentType } from '../domain/entities/AIModelCapability';
 import { processAudioNoteUseCase } from '../application/container';
 import { env } from '../shared/config/env';
 
@@ -35,6 +34,12 @@ const ORANGE = '#F59E0B';
 
 const CONTENT_TYPE_OPTIONS: ClassContentType[] = ['theory', 'math', 'image', 'general'];
 
+function formatRecordingTime(value: number) {
+  const minutes = Math.floor(value / 60).toString().padStart(2, '0');
+  const secs = (value % 60).toString().padStart(2, '0');
+  return `${minutes}:${secs}`;
+}
+
 export default function AudioRecorderScreen() {
   const route = useRoute<RouteProp<PropsList, 'Audio'>>();
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
@@ -45,19 +50,17 @@ export default function AudioRecorderScreen() {
 
   const [titulo, setTitulo] = useState(audioNoteTitle || '');
   const [audioUri, setAudioUri] = useState<string | null>(null);
-  const [audioName, setAudioName] = useState<string>('');
-  const [mimeType, setMimeType] = useState('audio/m4a');
+  const mimeTypeRef = useRef('audio/m4a');
   const [contentType, setContentType] = useState<ClassContentType>('theory');
-  const [analysisProvider, setAnalysisProvider] = useState<AIProvider>('gemini');
   const [loading, setLoading] = useState(false);
   const [textLoading, setTextLoading] = useState<string>('');
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const selectedCapability = useMemo(() => getModelCapabilityByContentType(contentType, analysisProvider), [contentType, analysisProvider]);
+  const selectedCapability = getModelCapabilityByContentType(contentType);
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -72,11 +75,6 @@ export default function AudioRecorderScreen() {
     };
   }, [isRecording, isPaused]);
 
-  const formatTime = (value: number) => {
-    const minutes = Math.floor(value / 60).toString().padStart(2, '0');
-    const secs = (value % 60).toString().padStart(2, '0');
-    return `${minutes}:${secs}`;
-  };
 
   async function iniciarGrabacion() {
     try {
@@ -95,12 +93,11 @@ export default function AudioRecorderScreen() {
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
 
-      setRecording(newRecording);
+      recordingRef.current = newRecording;
       setIsRecording(true);
       setIsPaused(false);
       setSeconds(0);
       setAudioUri(null);
-      setAudioName('');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo iniciar la grabación');
     }
@@ -108,12 +105,12 @@ export default function AudioRecorderScreen() {
 
   async function detenerGrabacion() {
     try {
-      if (!recording) return;
+      if (!recordingRef.current) return;
       setIsRecording(false);
       setIsPaused(false);
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
 
       if (!uri) {
         Alert.alert('Error', 'No se pudo obtener el archivo de audio grabado.');
@@ -122,8 +119,7 @@ export default function AudioRecorderScreen() {
 
       const fileName = `grabacion_${new Date().toISOString().replace(/[:.]/g, '-')}.m4a`;
       setAudioUri(uri);
-      setAudioName(fileName);
-      setMimeType('audio/m4a');
+      mimeTypeRef.current = 'audio/m4a';
 
       if (!titulo.trim()) {
         setTitulo(`Clase grabada ${new Date().toLocaleDateString()}`);
@@ -135,8 +131,8 @@ export default function AudioRecorderScreen() {
 
   async function pausarGrabacion() {
     try {
-      if (!recording) return;
-      await recording.pauseAsync();
+      if (!recordingRef.current) return;
+      await recordingRef.current.pauseAsync();
       setIsPaused(true);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo pausar la grabación');
@@ -145,8 +141,8 @@ export default function AudioRecorderScreen() {
 
   async function continuarGrabacion() {
     try {
-      if (!recording) return;
-      await recording.startAsync();
+      if (!recordingRef.current) return;
+      await recordingRef.current.startAsync();
       setIsPaused(false);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo continuar la grabación');
@@ -164,8 +160,7 @@ export default function AudioRecorderScreen() {
 
       const asset = result.assets[0];
       setAudioUri(asset.uri);
-      setAudioName(asset.name || 'audio_seleccionado');
-      setMimeType(asset.mimeType || 'audio/m4a');
+      mimeTypeRef.current = asset.mimeType || 'audio/m4a';
 
       if (!titulo.trim() && asset.name) {
         setTitulo(asset.name.replace(/\.[^/.]+$/, ''));
@@ -183,9 +178,8 @@ export default function AudioRecorderScreen() {
         subjectId,
         audioNoteId,
         audioUri: audioUri || '',
-        mimeType,
+        mimeType: mimeTypeRef.current,
         contentType,
-        aiProvider: analysisProvider,
         onProgress: setTextLoading,
       });
       Alert.alert(
@@ -244,39 +238,24 @@ export default function AudioRecorderScreen() {
             onValueChange={(value) => setContentType(value)}
             style={styles.picker}
           >
-            {CONTENT_TYPE_OPTIONS.map((option) => {
-              const model = getModelCapabilityByContentType(option);
-              return (
-                <Picker.Item
-                  key={option}
-                  label={CLASS_CONTENT_LABELS[option]}
-                  value={option}
-                />
-              );
-            })}
-          </Picker>
-        </View>
-
-        <Text style={[styles.label, { color: colors.muted }]}>Modelo para resumen y análisis</Text>
-        <View style={[styles.pickerWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
-          <Picker
-            selectedValue={analysisProvider}
-            onValueChange={(value) => setAnalysisProvider(value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Gemini · rápido para teoría y organización" value="gemini" />
-            <Picker.Item label="GPT / OpenAI · mejor para razonamiento, imágenes y documentos" value="openai" />
+            {CONTENT_TYPE_OPTIONS.map((option) => (
+              <Picker.Item
+                key={option}
+                label={CLASS_CONTENT_LABELS[option]}
+                value={option}
+              />
+            ))}
           </Picker>
         </View>
 
         <View style={[styles.selectedModelCard, { backgroundColor: colors.soft, borderColor: colors.border }]}>
           <View style={styles.selectedModelHeader}>
             <Sparkles color={PURPLE} size={18} />
-            <Text style={[styles.selectedModelTitle, { color: colors.text }]}>{selectedCapability.provider} {selectedCapability.modelName}</Text>
+            <Text style={[styles.selectedModelTitle, { color: colors.text }]}>Modelo de análisis automático</Text>
           </View>
+          <Text style={[styles.selectedModelText, { color: colors.muted }]}>La transcripción de audio siempre usa OpenAI gpt-4o-mini-transcribe.</Text>
+          <Text style={[styles.selectedModelText, { color: colors.muted }]}>El resumen y el refuerzo se enrutan automáticamente según el tipo de contenido: {selectedCapability.provider} {selectedCapability.modelName}.</Text>
           <Text style={[styles.selectedModelText, { color: colors.muted }]}>Mejor para: {selectedCapability.bestFor}</Text>
-          <Text style={[styles.selectedModelText, { color: colors.muted }]}>Uso dentro de la app: {selectedCapability.usedWhen}</Text>
-          <Text style={[styles.selectedModelText, { color: colors.muted }]}>Nota: la transcripción del audio siempre usa OpenAI gpt-4o-mini-transcribe por costo.</Text>
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>2. Audio de la clase</Text>
@@ -285,7 +264,7 @@ export default function AudioRecorderScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.transcriptionTitle}>OpenAI Whisper / transcriptor de audio</Text>
             <Text style={styles.transcriptionText}>
-              La conversión de audio a texto usa solo OpenAI gpt-4o-mini-transcribe por ser la opción económica para transcripción. El resumen y el chat pueden usar Gemini o GPT según selecciones.
+              La conversión de audio a texto usa solo OpenAI gpt-4o-mini-transcribe. El alumno ya no debe escoger modelo para transcribir; el análisis se enruta automáticamente por tipo de contenido.
             </Text>
           </View>
         </View>
@@ -293,54 +272,50 @@ export default function AudioRecorderScreen() {
         <View style={styles.recordCard}>
           <View style={styles.recordHeader}>
             <Clock color={isRecording ? '#EF4444' : BLUE} size={18} />
-            <Text style={[styles.recordTime, isRecording && styles.recordTimeActive]}>{formatTime(seconds)}</Text>
+            <Text style={[styles.recordTime, isRecording && styles.recordTimeActive]}>{formatRecordingTime(seconds)}</Text>
             <Text style={styles.recordStatus}>{isRecording ? (isPaused ? 'Grabación pausada' : 'Grabando desde la app...') : 'Listo para grabar'}</Text>
           </View>
 
           {!isRecording ? (
-            <TouchableOpacity
+            <Pressable
               style={[styles.actionButton, styles.recordStartButton]}
               onPress={iniciarGrabacion}
               disabled={loading}
-              activeOpacity={0.85}
             >
               <Mic color="#fff" size={21} />
               <Text style={styles.actionButtonText}>Grabar audio desde la app</Text>
-            </TouchableOpacity>
+            </Pressable>
           ) : (
             <View style={styles.recordControlsRow}>
-              <TouchableOpacity
+              <Pressable
                 style={[styles.smallRecordButton, isPaused ? styles.resumeButton : styles.pauseButton]}
                 onPress={isPaused ? continuarGrabacion : pausarGrabacion}
                 disabled={loading}
-                activeOpacity={0.85}
               >
                 {isPaused ? <Play color="#fff" size={18} /> : <Pause color="#fff" size={18} />}
                 <Text style={styles.smallRecordButtonText}>{isPaused ? 'Continuar' : 'Pausar'}</Text>
-              </TouchableOpacity>
+              </Pressable>
 
-              <TouchableOpacity
+              <Pressable
                 style={[styles.smallRecordButton, styles.stopButton]}
                 onPress={detenerGrabacion}
                 disabled={loading}
-                activeOpacity={0.85}
               >
                 <Square color="#fff" size={18} />
                 <Text style={styles.smallRecordButtonText}>Guardar segmento</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           )}
         </View>
 
-        <TouchableOpacity
+        <Pressable
           style={[styles.actionButton, styles.uploadButton]}
           onPress={seleccionarAudio}
           disabled={loading}
-          activeOpacity={0.85}
         >
           <Upload color="#fff" size={22} />
           <Text style={styles.actionButtonText}>Subir archivo de audio</Text>
-        </TouchableOpacity>
+        </Pressable>
 
         {audioUri && (
           <View style={styles.successBox}>
@@ -352,17 +327,6 @@ export default function AudioRecorderScreen() {
           </View>
         )}
 
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>3. Modelos disponibles</Text>
-        <View style={styles.modelList}>
-          {AI_MODEL_CAPABILITIES.map((item) => (
-            <View key={item.id} style={styles.modelCard}>
-              <Text style={styles.modelName}>{item.provider} · {item.modelName}</Text>
-              <Text style={styles.modelRoute}>{item.routeLabel}</Text>
-              <Text style={styles.modelBest}>Mejor para: {item.bestFor}</Text>
-            </View>
-          ))}
-        </View>
-
         {env.useMockAI && (
           <View style={styles.mockBox}>
             <Text style={styles.mockTitle}>Modo prueba activo</Text>
@@ -370,17 +334,16 @@ export default function AudioRecorderScreen() {
           </View>
         )}
 
-        <TouchableOpacity
+        <Pressable
           style={[
             styles.submitButton,
             (!audioUri || loading) && styles.disabledButton,
           ]}
           onPress={guardarData}
           disabled={!audioUri || loading}
-          activeOpacity={0.85}
         >
           <Text style={styles.submitText}>{isAppendingToClass ? 'Agregar audio a esta clase' : 'Procesar y guardar clase'}</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
         <LoadingModal visible={loading} text={textLoading} />
       </ScrollView>
@@ -433,11 +396,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.08)',
   },
   sectionTitle: {
     color: TEXT,

@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
@@ -110,12 +110,12 @@ export default function LoginScreen() {
           <Text style={styles.panelText}>
             Graba, transcribe, resume y pregunta a un tutor IA entrenado con tus propias clases.
           </Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => goTo('login')}>
+          <Pressable style={styles.primaryButton} onPress={() => goTo('login')}>
             <Text style={styles.primaryButtonText}>Comenzar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.linkButton} onPress={() => goTo('login')}>
+          </Pressable>
+          <Pressable style={styles.linkButton} onPress={() => goTo('login')}>
             <Text style={styles.linkButtonText}>Ya tengo cuenta</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     );
@@ -136,9 +136,9 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity style={styles.backButton} onPress={() => goTo('welcome')} disabled={loading}>
+        <Pressable style={styles.backButton} onPress={() => goTo('welcome')} disabled={loading}>
           <ArrowLeft size={22} color={TEXT} />
-        </TouchableOpacity>
+        </Pressable>
 
         <Text style={styles.brand}>AulaIA</Text>
         <Text style={styles.title}>{isLoginMode ? 'Iniciar sesión' : 'Crear cuenta'}</Text>
@@ -149,20 +149,20 @@ export default function LoginScreen() {
         </Text>
 
         <View style={styles.tabsContainer}>
-          <TouchableOpacity
+          <Pressable
             style={[styles.tab, isLoginMode && styles.tabActive]}
             onPress={() => goTo('login')}
             disabled={loading}
           >
             <Text style={[styles.tabText, isLoginMode && styles.tabTextActive]}>Iniciar sesión</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </Pressable>
+          <Pressable
             style={[styles.tab, !isLoginMode && styles.tabActive]}
             onPress={() => goTo('register')}
             disabled={loading}
           >
             <Text style={[styles.tabText, !isLoginMode && styles.tabTextActive]}>Crear usuario</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {isLoginMode ? (
@@ -188,27 +188,27 @@ export default function LoginScreen() {
                 secureTextEntry={!showPass}
                 editable={!loading}
               />
-              <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPass(!showPass)}>
+              <Pressable style={styles.eyeButton} onPress={() => setShowPass(!showPass)}>
                 {showPass ? <EyeOff size={18} color={MUTED} /> : <Eye size={18} color={MUTED} />}
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
-            <TouchableOpacity onPress={() => Alert.alert('Pendiente', 'Primero hay que activar recuperación de contraseña en Supabase Auth.')}>
+            <Pressable onPress={() => Alert.alert('Pendiente', 'Primero hay que activar recuperación de contraseña en Supabase Auth.')}>
               <Text style={styles.forgotText}>Olvidé mi contraseña</Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
+            <Pressable
               style={[styles.primaryButton, loginDisabled && styles.disabledButton]}
               onPress={iniciarSesion}
               disabled={loginDisabled}
             >
               <Text style={styles.primaryButtonText}>Ingresar</Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.googleButton} onPress={googlePendiente} disabled={loading}>
+            <Pressable style={styles.googleButton} onPress={googlePendiente} disabled={loading}>
               <Text style={styles.googleG}>G</Text>
               <Text style={styles.googleText}>Continuar con Google</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         ) : (
           <View>
@@ -242,9 +242,9 @@ export default function LoginScreen() {
                 secureTextEntry={!showPass}
                 editable={!loading}
               />
-              <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPass(!showPass)}>
+              <Pressable style={styles.eyeButton} onPress={() => setShowPass(!showPass)}>
                 {showPass ? <EyeOff size={18} color={MUTED} /> : <Eye size={18} color={MUTED} />}
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <FieldLabel text="Confirmar contraseña" />
@@ -257,9 +257,9 @@ export default function LoginScreen() {
                 secureTextEntry={!showConfirmPass}
                 editable={!loading}
               />
-              <TouchableOpacity style={styles.eyeButton} onPress={() => setShowConfirmPass(!showConfirmPass)}>
+              <Pressable style={styles.eyeButton} onPress={() => setShowConfirmPass(!showConfirmPass)}>
                 {showConfirmPass ? <EyeOff size={18} color={MUTED} /> : <Eye size={18} color={MUTED} />}
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <FieldLabel text="Universidad / Instituto" />
@@ -271,13 +271,13 @@ export default function LoginScreen() {
               editable={!loading}
             />
 
-            <TouchableOpacity
+            <Pressable
               style={[styles.primaryButton, registerDisabled && styles.disabledButton]}
               onPress={crearCuenta}
               disabled={registerDisabled}
             >
               <Text style={styles.primaryButtonText}>Crear cuenta</Text>
-            </TouchableOpacity>
+            </Pressable>
 
             <Text style={styles.termsText}>
               Al crear una cuenta aceptas el uso responsable de grabaciones académicas.
@@ -376,10 +376,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
-    shadowColor: BLUE,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 3,
+    boxShadow: '0px 5px 12px rgba(37, 99, 235, 0.22)',
   },
   disabledButton: { opacity: 0.55 },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },

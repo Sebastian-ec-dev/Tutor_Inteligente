@@ -11,7 +11,7 @@ export type Subject = {
 
 export type NewSubject = {
   name: string;
-  userId: string;
+  userId?: string;
   teacher?: string;
   description?: string;
   color?: string;

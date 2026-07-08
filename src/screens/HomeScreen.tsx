@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   TextInput,
   Alert,
@@ -66,14 +66,6 @@ export default function HomeScreen() {
   const colors = appTheme.colors;
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      leerMaterias();
-      cargarPerfil();
-    });
-    return unsubscribe;
-  }, [navigation]);
-
   const filteredMaterias = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return materias;
@@ -84,7 +76,7 @@ export default function HomeScreen() {
     });
   }, [materias, search]);
 
-  async function cargarPerfil() {
+  const cargarPerfil = useCallback(async () => {
     try {
       const profile = await getProfileUseCase.execute();
       const name = profile.displayName || profile.email?.split('@')[0] || '';
@@ -92,9 +84,9 @@ export default function HomeScreen() {
     } catch (error) {
       console.log('[HomeScreen] No se pudo cargar el perfil:', error);
     }
-  }
+  }, []);
 
-  async function leerMaterias() {
+  const leerMaterias = useCallback(async () => {
     try {
       setLoading(true);
       const data = await listSubjectsUseCase.execute();
@@ -104,7 +96,18 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      leerMaterias();
+      cargarPerfil();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [navigation, leerMaterias, cargarPerfil]);
 
   function abrirFormulario() {
     setEditingSubject(null);
@@ -201,7 +204,7 @@ export default function HomeScreen() {
     const cardColor = item.color || BLUE;
 
     return (
-      <TouchableOpacity
+      <Pressable
         style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() =>
           navigation.navigate('Resumen', {
@@ -209,7 +212,6 @@ export default function HomeScreen() {
             subjectName: item.name,
           })
         }
-        activeOpacity={0.84}
       >
         <View style={[styles.subjectIconBox, { backgroundColor: `${cardColor}22` }]}> 
           <Text style={styles.subjectIcon}>{item.icon || '📚'}</Text>
@@ -224,23 +226,23 @@ export default function HomeScreen() {
             <Text style={styles.badgeBlue}>Contexto directo</Text>
           </View>
           <View style={styles.cardActionsRow}>
-            <TouchableOpacity style={styles.miniActionButton} onPress={(event) => { event.stopPropagation(); abrirEditarMateria(item); }}>
+            <Pressable style={styles.miniActionButton} onPress={(event) => { event.stopPropagation(); abrirEditarMateria(item); }}>
               <Pencil size={13} color={BLUE} />
               <Text style={styles.miniActionText}>Editar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.miniActionButton} onPress={(event) => { event.stopPropagation(); navigation.navigate('Members', { subjectId: item.id, subjectName: item.name }); }}>
+            </Pressable>
+            <Pressable style={styles.miniActionButton} onPress={(event) => { event.stopPropagation(); navigation.navigate('Members', { subjectId: item.id, subjectName: item.name }); }}>
               <Users size={13} color={PURPLE} />
               <Text style={[styles.miniActionText, { color: PURPLE }]}>Integrantes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.miniDangerButton} onPress={(event) => { event.stopPropagation(); eliminarMateria(item); }}>
+            </Pressable>
+            <Pressable style={styles.miniDangerButton} onPress={(event) => { event.stopPropagation(); eliminarMateria(item); }}>
               <Trash2 size={13} color={RED} />
               <Text style={styles.miniDangerText}>Eliminar</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
 
         <ChevronRight size={20} color={MUTED} />
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
@@ -253,12 +255,12 @@ export default function HomeScreen() {
             <Text style={[styles.headerSubtitle, { color: colors.muted }]}>Administra tus materias y aulas</Text>
           </View>
           <View style={styles.headerButtons}>
-            <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate('Profile')}>
+            <Pressable style={styles.profileButton} onPress={() => navigation.navigate('Profile')}>
               <UserRound color={BLUE} size={21} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.logoutButton} onPress={cerrarSesion}>
+            </Pressable>
+            <Pressable style={styles.logoutButton} onPress={cerrarSesion}>
               <LogOut color={RED} size={22} />
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
 
@@ -275,18 +277,18 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.primaryAction} onPress={abrirFormulario}>
+        <Pressable style={styles.primaryAction} onPress={abrirFormulario}>
           <Plus color="#fff" size={18} />
           <Text style={styles.primaryActionText}>Crear materia</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('Chatbot')}>
+        </Pressable>
+        <Pressable style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('Chatbot')}>
           <MessageSquare color={PURPLE} size={18} />
           <Text style={styles.secondaryActionText}>Tutor IA</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('JoinSubject')}>
+        </Pressable>
+        <Pressable style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('JoinSubject')}>
           <QrCode color={PURPLE} size={18} />
           <Text style={styles.secondaryActionText}>Unirme</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <View style={styles.sectionHeader}>
@@ -299,10 +301,10 @@ export default function HomeScreen() {
           <BookOpen color={MUTED} size={42} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No hay materias todavía</Text>
           <Text style={[styles.emptyText, { color: colors.muted }]}>Crea una materia para guardar audios, resúmenes y chats por usuario.</Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={abrirFormulario}>
+          <Pressable style={styles.emptyButton} onPress={abrirFormulario}>
             <Plus color="#fff" size={18} />
             <Text style={styles.emptyButtonText}>Crear primera materia</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -321,9 +323,9 @@ export default function HomeScreen() {
                 <Text style={styles.modalTitle}>{editingSubject ? 'Editar materia' : 'Crear materia'}</Text>
                 <Text style={styles.modalSubtitle}>Nombre, docente, descripción, color e icono se guardan en Supabase.</Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)} disabled={loading}>
+              <Pressable style={styles.closeButton} onPress={() => setModalVisible(false)} disabled={loading}>
                 <X size={20} color={TEXT} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -348,7 +350,7 @@ export default function HomeScreen() {
               <FieldLabel text="Color de materia" />
               <View style={styles.colorsRow}>
                 {SUBJECT_COLORS.map((color) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={color}
                     style={[
                       styles.colorButton,
@@ -385,13 +387,13 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
+              <Pressable
                 style={[styles.createButton, (!form.name.trim() || loading) && styles.disabledButton]}
                 onPress={guardarMateria}
                 disabled={!form.name.trim() || loading}
               >
                 <Text style={styles.createButtonText}>{editingSubject ? 'Guardar cambios' : 'Crear materia'}</Text>
-              </TouchableOpacity>
+              </Pressable>
             </ScrollView>
           </View>
         </View>

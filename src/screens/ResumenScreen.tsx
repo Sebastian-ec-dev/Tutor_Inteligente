@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Alert,
   Modal,
@@ -42,18 +42,10 @@ export default function ResumenScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [myRole, setMyRole] = useState<string>('student');
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingClass, setEditingClass] = useState<AudioNote | null>(null);
+  const editingClassRef = useRef<AudioNote | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      leerResumenes();
-      cargarPermisos();
-    });
-    return unsubscribe;
-  }, [navigation]);
-
-  async function leerResumenes() {
+  const leerResumenes = useCallback(async () => {
     try {
       setLoading(true);
       const data = await listAudioNotesUseCase.execute(subjectId);
@@ -63,9 +55,9 @@ export default function ResumenScreen() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [subjectId]);
 
-  async function cargarPermisos() {
+  const cargarPermisos = useCallback(async () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const uid = userData.user?.id || '';
@@ -83,25 +75,37 @@ export default function ResumenScreen() {
     } catch (error) {
       console.log('[ResumenScreen] No se pudo cargar permisos:', error);
     }
-  }
+  }, [subjectId]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      leerResumenes();
+      cargarPermisos();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [navigation, leerResumenes, cargarPermisos]);
 
   function canManageClass(item: AudioNote): boolean {
     return item.userId === currentUserId || ['owner', 'admin', 'teacher'].includes(myRole);
   }
 
   function abrirEditarClase(item: AudioNote) {
-    setEditingClass(item);
+    editingClassRef.current = item;
     setEditingTitle(item.title);
     setEditModalVisible(true);
   }
 
   async function guardarNombreClase() {
     try {
+      const editingClass = editingClassRef.current;
       if (!editingClass) return;
       setLoading(true);
       await updateAudioNoteUseCase.execute({ id: editingClass.id, title: editingTitle });
       setEditModalVisible(false);
-      setEditingClass(null);
+      editingClassRef.current = null;
       setEditingTitle('');
       await leerResumenes();
     } catch (error: any) {
@@ -154,7 +158,7 @@ export default function ResumenScreen() {
 
     return (
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TouchableOpacity style={styles.cardHeader} onPress={() => toggleExpandir(item.id)}>
+        <Pressable style={styles.cardHeader} onPress={() => toggleExpandir(item.id)}>
           <View style={styles.cardTitleRow}>
             <View style={styles.fileIconBox}>
               <FileAudio color="#2563EB" size={22} />
@@ -165,7 +169,7 @@ export default function ResumenScreen() {
             </View>
           </View>
           {isExpanded ? <ChevronUp color="#64748B" /> : <ChevronDown color="#64748B" />}
-        </TouchableOpacity>
+        </Pressable>
 
         {isExpanded && (
           <View style={styles.cardContent}>
@@ -176,34 +180,31 @@ export default function ResumenScreen() {
             </View>
 
             <View style={styles.classActionsRow}>
-              <TouchableOpacity
+              <Pressable
                 style={styles.classChatButton}
                 onPress={() => navigation.navigate('Chatbot', { subjectId, subjectName, classId: item.id, className: item.title })}
-                activeOpacity={0.85}
               >
                 <MessageSquare color="#fff" size={16} />
                 <Text style={styles.classChatButtonText}>Preguntar esta clase</Text>
-              </TouchableOpacity>
+              </Pressable>
 
               {canManageClass(item) && (
                 <>
-                  <TouchableOpacity style={styles.classIconButton} onPress={() => abrirEditarClase(item)} activeOpacity={0.85}>
+                  <Pressable style={styles.classIconButton} onPress={() => abrirEditarClase(item)}>
                     <Pencil color="#2563EB" size={16} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </Pressable>
+                  <Pressable
                     style={styles.classIconButton}
                     onPress={() => navigation.navigate('Audio', { subjectId, audioNoteId: item.id, audioNoteTitle: item.title })}
-                    activeOpacity={0.85}
                   >
                     <Plus color="#2563EB" size={18} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </Pressable>
+                  <Pressable
                     style={[styles.classIconButton, styles.classDangerButton]}
                     onPress={() => eliminarClase(item)}
-                    activeOpacity={0.85}
                   >
                     <Trash2 color="#EF4444" size={16} />
-                  </TouchableOpacity>
+                  </Pressable>
                 </>
               )}
             </View>
@@ -216,13 +217,13 @@ export default function ResumenScreen() {
 
             {cleanTranscript ? (
               <View style={styles.section}>
-                <TouchableOpacity style={styles.transcriptToggle} onPress={() => toggleTranscript(item.id)} activeOpacity={0.8}>
+                <Pressable style={styles.transcriptToggle} onPress={() => toggleTranscript(item.id)}>
                   <Text style={styles.transcriptToggleText}>Transcripción literal del audio</Text>
                   <View style={styles.transcriptToggleRight}>
                     <Text style={styles.transcriptToggleHint}>{isTranscriptOpen ? 'Ocultar' : 'Mostrar'}</Text>
                     {isTranscriptOpen ? <ChevronUp color="#2563EB" size={18} /> : <ChevronDown color="#2563EB" size={18} />}
                   </View>
-                </TouchableOpacity>
+                </Pressable>
 
                 {isTranscriptOpen ? (
                   <View style={styles.transcriptBox}>
@@ -244,18 +245,18 @@ export default function ResumenScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.actionsPanel, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={styles.primaryAction} onPress={() => navigation.navigate('Audio', { subjectId })}>
+        <Pressable style={styles.primaryAction} onPress={() => navigation.navigate('Audio', { subjectId })}>
           <Mic color="#fff" size={17} />
           <Text style={styles.primaryActionText}>Grabar / subir audio</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('Members', { subjectId, subjectName })}>
+        </Pressable>
+        <Pressable style={styles.secondaryAction} onPress={() => navigation.navigate('Members', { subjectId, subjectName })}>
           <Users color="#7C3AED" size={17} />
           <Text style={styles.secondaryActionText}>Integrantes</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('Chatbot', { subjectId, subjectName })}>
+        </Pressable>
+        <Pressable style={styles.secondaryAction} onPress={() => navigation.navigate('Chatbot', { subjectId, subjectName })}>
           <MessageSquare color="#7C3AED" size={17} />
           <Text style={styles.secondaryActionText}>Chat</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {resumenes.length === 0 ? (
@@ -266,9 +267,9 @@ export default function ResumenScreen() {
         <FlatList data={resumenes} keyExtractor={(item) => item.id} renderItem={renderResumen} contentContainerStyle={styles.list} />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('Audio', { subjectId })}>
+      <Pressable style={styles.fab} onPress={() => navigation.navigate('Audio', { subjectId })}>
         <Plus color="#fff" size={30} />
-      </TouchableOpacity>
+      </Pressable>
 
       <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -282,12 +283,12 @@ export default function ResumenScreen() {
               placeholderTextColor="#64748B"
             />
             <View style={styles.modalActionsRow}>
-              <TouchableOpacity style={styles.modalCancelButton} onPress={() => setEditModalVisible(false)}>
+              <Pressable style={styles.modalCancelButton} onPress={() => setEditModalVisible(false)}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveButton} onPress={guardarNombreClase}>
+              </Pressable>
+              <Pressable style={styles.modalSaveButton} onPress={guardarNombreClase}>
                 <Text style={styles.modalSaveText}>Guardar</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         </View>

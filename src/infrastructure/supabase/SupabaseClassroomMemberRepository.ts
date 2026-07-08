@@ -7,13 +7,21 @@ import {
 import { ClassroomMemberRepositoryPort } from '../../domain/ports/ClassroomMemberRepositoryPort';
 import { supabase } from './supabaseClient';
 
+function getMemberUserId(row: any): string {
+  return row.user_id;
+}
+
+function getMemberRole(row: any): ClassroomRole {
+  return row.member_role;
+}
+
 function mapMember(row: any, profile?: any): ClassroomMember {
   const resolvedProfile = profile || (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles);
   return {
     id: row.id,
     subjectId: row.subject_id,
-    userId: row.user_id,
-    role: row.role,
+    accountId: getMemberUserId(row),
+    memberRole: getMemberRole(row),
     email: resolvedProfile?.email || null,
     displayName: resolvedProfile?.display_name || null,
     createdAt: row.created_at,
@@ -39,7 +47,7 @@ function mapInvite(row: any): ClassroomInvite {
 
 const INVITE_SELECT = 'id, subject_id, invited_email, role, status, created_by, token, invite_type, max_uses, uses_count, expires_at, created_at';
 const INVITE_SELECT_LEGACY = 'id, subject_id, invited_email, role, status, created_by, created_at';
-const MEMBER_SELECT = 'id, subject_id, user_id, role, created_at';
+const MEMBER_SELECT = 'id, subject_id, user_id, member_role:role, created_at';
 const MEMBER_WITH_PROFILE_SELECT = `${MEMBER_SELECT}, profiles:user_id(email, display_name)`;
 
 function isSchemaCacheError(error: { message?: string } | null): boolean {
@@ -67,7 +75,7 @@ export class SupabaseClassroomMemberRepository implements ClassroomMemberReposit
 
     if (membersError) throw new Error(membersError.message);
 
-    const userIds = (membersData || []).map((row: any) => row.user_id).filter(Boolean);
+    const userIds = (membersData || []).flatMap((row: any) => row.user_id ? [row.user_id] : []);
     const { data: profilesData } = userIds.length
       ? await supabase.from('profiles').select('id, email, display_name').in('id', userIds)
       : { data: [] as any[] };
@@ -108,7 +116,6 @@ export class SupabaseClassroomMemberRepository implements ClassroomMemberReposit
       subject_id: input.subjectId,
       invited_email: input.invitedEmail,
       role: input.role,
-      created_by: input.createdBy,
       status: 'pending',
       invite_type: 'email',
       max_uses: 1,
@@ -130,8 +137,7 @@ export class SupabaseClassroomMemberRepository implements ClassroomMemberReposit
         subject_id: input.subjectId,
         invited_email: input.invitedEmail,
         role: input.role,
-        created_by: input.createdBy,
-        status: 'pending',
+          status: 'pending',
       })
       .select(INVITE_SELECT_LEGACY)
       .single();
@@ -153,8 +159,7 @@ export class SupabaseClassroomMemberRepository implements ClassroomMemberReposit
         subject_id: input.subjectId,
         invited_email: 'enlace-compartido',
         role: input.role,
-        created_by: input.createdBy,
-        status: 'pending',
+          status: 'pending',
         invite_type: input.inviteType,
         max_uses: input.maxUses || 50,
         uses_count: 0,

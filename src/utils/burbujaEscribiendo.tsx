@@ -4,15 +4,23 @@ import { Bot } from "lucide-react-native";
 import { COLORS } from "../components/ui/Colors";
 
 export default function TypingIndicator() {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
+  const dot1Ref = useRef<Animated.Value | null>(null);
+  const dot2Ref = useRef<Animated.Value | null>(null);
+  const dot3Ref = useRef<Animated.Value | null>(null);
+
+  if (!dot1Ref.current) dot1Ref.current = new Animated.Value(0);
+  if (!dot2Ref.current) dot2Ref.current = new Animated.Value(0);
+  if (!dot3Ref.current) dot3Ref.current = new Animated.Value(0);
+
+  const dot1 = dot1Ref.current;
+  const dot2 = dot2Ref.current;
+  const dot3 = dot3Ref.current;
 
   useEffect(() => {
-    const animate = (value: Animated.Value, delay: number) =>
+    const animations = [dot1, dot2, dot3].map((value, index) =>
       Animated.loop(
         Animated.sequence([
-          Animated.delay(delay),
+          Animated.delay(index * 150),
           Animated.timing(value, {
             toValue: 1,
             duration: 350,
@@ -23,14 +31,17 @@ export default function TypingIndicator() {
             duration: 350,
             useNativeDriver: true,
           }),
-          Animated.delay(450 - delay),
+          Animated.delay(450 - index * 150),
         ]),
-      ).start();
+      ),
+    );
 
-    animate(dot1, 0);
-    animate(dot2, 150);
-    animate(dot3, 300);
-  }, []);
+    animations.forEach((animation) => animation.start());
+
+    return () => {
+      animations.forEach((animation) => animation.stop());
+    };
+  }, [dot1, dot2, dot3]);
 
   const dotStyle = (value: Animated.Value) => ({
     opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
@@ -81,11 +92,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.12)",
   },
 
   /* Burbujas */
@@ -93,11 +100,7 @@ const styles = StyleSheet.create({
     padding: 14,
     paddingHorizontal: 16,
     borderRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.08)",
   },
 
   botBubble: {
