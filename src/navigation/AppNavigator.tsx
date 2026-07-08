@@ -13,6 +13,7 @@ import SplashScreen from '../screens/SplashScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import MembersScreen from '../screens/MembersScreen';
 import JoinSubjectScreen from '../screens/JoinSubjectScreen';
+import { useThemeMode } from '../shared/theme/ThemeContext';
 
 export type PropsList = {
   Login: undefined;
@@ -32,6 +33,7 @@ export default function AppNavigator() {
   const [session, setSession] = useState<AuthSession>(null);
   const [splashDone, setSplashDone] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const { colors } = useThemeMode();
 
   useEffect(() => {
     let mounted = true;
@@ -67,7 +69,14 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.navCard },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text, fontWeight: '900' },
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
         {session?.user ? (
           <>
             <Stack.Screen

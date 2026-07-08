@@ -28,8 +28,11 @@ import {
   Trash2,
   Users,
   QrCode,
+  Moon,
+  Sun,
 } from "lucide-react-native";
 import LoadingModal from "../components/ui/LoadingModal";
+import { useThemeMode } from "../shared/theme/ThemeContext";
 import { Subject } from "../domain/entities/Subject";
 import {
   createSubjectUseCase,
@@ -76,6 +79,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
+  const { isDark, colors, toggleTheme } = useThemeMode();
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
@@ -220,7 +224,13 @@ export default function HomeScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
         onPress={() =>
           navigation.navigate("Resumen", {
             subjectId: item.id,
@@ -236,19 +246,19 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardSubtitle}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.muted }]}>
             {item.teacher || "Docente no definido"}
           </Text>
           {!!item.description && (
-            <Text style={styles.cardDescription} numberOfLines={2}>
+            <Text style={[styles.cardDescription, { color: colors.muted }]} numberOfLines={2}>
               {item.description}
             </Text>
           )}
 
           <View style={styles.cardActionsRow}>
             <TouchableOpacity
-              style={styles.miniActionButton}
+              style={[styles.miniActionButton, { backgroundColor: colors.surfaceMuted }]}
               onPress={(event) => {
                 event.stopPropagation();
                 abrirEditarMateria(item);
@@ -271,24 +281,36 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <ChevronRight size={20} color={MUTED} />
+        <ChevronRight size={20} color={colors.muted} />
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerPanel}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.headerPanel, { backgroundColor: colors.background }]}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.greeting}>
+            <Text style={[styles.greeting, { color: colors.text }]}>
               Hola{displayName ? `, ${displayName}` : ""} 👋
             </Text>
-            <Text style={styles.headerSubtitle}>
+            <Text style={[styles.headerSubtitle, { color: colors.muted }]}>
               ¿Qué clase quieres estudiar hoy?
             </Text>
           </View>
           <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={[
+                styles.themeButton,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+              onPress={toggleTheme}
+              accessibilityRole="button"
+              accessibilityLabel={isDark ? "Activar modo claro" : "Activar modo oscuro"}
+              activeOpacity={0.85}
+            >
+              {isDark ? <Sun color="#FACC15" size={21} /> : <Moon color={BLUE} size={21} />}
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.logoutButton}
               onPress={cerrarSesion}
@@ -298,14 +320,19 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.searchBox}>
-          <Search size={17} color={MUTED} />
+        <View
+          style={[
+            styles.searchBox,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Search size={17} color={colors.muted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Buscar materia, docente o descripción..."
             value={search}
             onChangeText={setSearch}
-            placeholderTextColor={MUTED}
+            placeholderTextColor={colors.muted}
           />
         </View>
       </View>
@@ -320,7 +347,10 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.secondaryAction}
+          style={[
+            styles.secondaryAction,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
           onPress={() => navigation.navigate("JoinSubject")}
         >
           <QrCode color={PURPLE} size={18} />
@@ -329,17 +359,22 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Mis materias</Text>
-        <Text style={styles.sectionCounter}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Mis materias</Text>
+        <Text style={[styles.sectionCounter, { color: colors.muted }]}>
           {filteredMaterias.length} visibles
         </Text>
       </View>
 
       {filteredMaterias.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <BookOpen color={MUTED} size={42} />
-          <Text style={styles.emptyTitle}>No hay materias todavía</Text>
-          <Text style={styles.emptyText}>
+        <View
+          style={[
+            styles.emptyBox,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <BookOpen color={colors.muted} size={42} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No hay materias todavía</Text>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>
             Crea una materia para guardar audios, resúmenes y chats por usuario.
           </Text>
           <TouchableOpacity
@@ -366,20 +401,23 @@ export default function HomeScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { backgroundColor: colors.background }]}>
             <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[
+                  styles.closeButton,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
                 onPress={() => setModalVisible(false)}
                 disabled={loading}
               >
-                <X size={20} color={TEXT} />
+                <X size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
                   {editingSubject ? "Editar materia" : "Crear materia"}
                 </Text>
               </View>
@@ -391,8 +429,16 @@ export default function HomeScreen() {
             >
               <FieldLabel text="Nombre de la materia" />
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
                 placeholder="Ej. Bases de Datos"
+                placeholderTextColor={colors.muted}
                 value={form.name}
                 onChangeText={(name) => setForm((prev) => ({ ...prev, name }))}
                 editable={!loading}
@@ -400,8 +446,16 @@ export default function HomeScreen() {
 
               <FieldLabel text="Docente" />
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
                 placeholder="Ej. Valeria Cevallos"
+                placeholderTextColor={colors.muted}
                 value={form.teacher}
                 onChangeText={(teacher) =>
                   setForm((prev) => ({ ...prev, teacher }))
@@ -427,8 +481,9 @@ export default function HomeScreen() {
 
               <FieldLabel text="Descripción" />
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
                 placeholder="Descripción breve de la materia..."
+                placeholderTextColor={colors.muted}
                 value={form.description}
                 onChangeText={(description) =>
                   setForm((prev) => ({ ...prev, description }))
@@ -447,7 +502,7 @@ export default function HomeScreen() {
                   },
                 ]}
               >
-                <Text style={styles.previewLabel}>Vista previa</Text>
+                <Text style={[styles.previewLabel, { color: colors.text }]}>Vista previa</Text>
                 <View style={styles.previewRow}>
                   <View
                     style={[
@@ -458,10 +513,10 @@ export default function HomeScreen() {
                     <Text style={styles.previewEmoji}>📚</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.previewTitle}>
+                    <Text style={[styles.previewTitle, { color: colors.text }]}>
                       {form.name || "Nombre de materia"}
                     </Text>
-                    <Text style={styles.previewSubtitle}>
+                    <Text style={[styles.previewSubtitle, { color: colors.muted }]}>
                       {form.teacher || "Docente"}
                     </Text>
                   </View>
@@ -485,7 +540,12 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      <View style={styles.bottomBar}>
+      <View
+        style={[
+          styles.bottomBar,
+          { backgroundColor: colors.navCard, borderTopColor: colors.border },
+        ]}
+      >
         <TouchableOpacity style={styles.bottomItemActive}>
           <BookOpen color={BLUE} size={20} />
           <Text style={styles.bottomActiveText}>Materias</Text>
@@ -511,15 +571,15 @@ export default function HomeScreen() {
           style={styles.bottomItem}
           onPress={() => navigation.navigate("Chatbot")}
         >
-          <Brain color={MUTED} size={20} />
-          <Text style={styles.bottomText}>Tutor IA</Text>
+          <Brain color={colors.muted} size={20} />
+          <Text style={[styles.bottomText, { color: colors.muted }]}>Tutor IA</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.bottomItem}
           onPress={() => navigation.navigate("Profile")}
         >
-          <UserRound color={MUTED} size={20} />
-          <Text style={styles.bottomText}>Perfil</Text>
+          <UserRound color={colors.muted} size={20} />
+          <Text style={[styles.bottomText, { color: colors.muted }]}>Perfil</Text>
         </TouchableOpacity>
       </View>
 
@@ -576,6 +636,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEE2E2",
     alignItems: "center",
     justifyContent: "center",
+  },
+  themeButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
   searchBox: {
     height: 46,
