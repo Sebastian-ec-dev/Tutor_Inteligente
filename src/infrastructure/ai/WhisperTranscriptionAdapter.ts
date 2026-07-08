@@ -1,4 +1,5 @@
 import { TranscriptionPort } from '../../domain/ports/TranscriptionPort';
+import { buildTranscriptionPrompt } from '../../application/promptBuilders';
 import { env } from '../../shared/config/env';
 
 export class WhisperTranscriptionAdapter implements TranscriptionPort {
@@ -26,7 +27,7 @@ export class WhisperTranscriptionAdapter implements TranscriptionPort {
               content: [
                 {
                   type: 'input_text',
-                  text: 'Transcribe este audio académico. Omite contraseñas, usuarios, correos, teléfonos, identificaciones y datos sensibles.',
+                  text: buildTranscriptionPrompt(),
                 },
                 {
                   type: 'input_audio',

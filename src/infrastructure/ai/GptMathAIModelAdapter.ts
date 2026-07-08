@@ -9,12 +9,26 @@ export class GptMathAIModelAdapter implements AIModelPort {
   constructor(private readonly fallbackModel?: AIModelPort) {}
 
   async generateText(prompt: string, attachment?: AITextPart): Promise<string> {
+    return this.requestText(prompt, attachment, env.aiChatTemperature, env.openAIChatModel);
+  }
+
+  async analyzeClass(input: { content: string; contentType: ClassContentType }): Promise<string> {
+    const prompt = buildClassAnalysisPrompt(input.content, input.contentType);
+    return this.requestText(prompt, undefined, env.aiSummaryTemperature, env.openAISummaryModel);
+  }
+
+  private async requestText(
+    prompt: string,
+    attachment: AITextPart | undefined,
+    temperature: number,
+    textModel: string,
+  ): Promise<string> {
     // En Expo se permite probar sin romper el flujo: si no hay clave OpenAI,
     // se usa el adaptador de respaldo. La pantalla sigue entrando por la ruta GPT.
     if (!env.openAIApiKey) {
       if (this.fallbackModel) {
         return this.fallbackModel.generateText(
-          `[Ruta OpenAI GPT-4.1 mini / modo Light solicitada. Prioriza razonamiento paso a paso, ejercicios, fórmulas e interpretación visual.]\n\n${prompt}`,
+          `[Ruta OpenAI GPT-4.1 mini / modo Light solicitada. Temperatura configurada: ${temperature}. Prioriza respuestas precisas, razonamiento paso a paso, ejercicios, fórmulas e interpretación visual.]\n\n${prompt}`,
           attachment,
         );
       }
@@ -38,8 +52,9 @@ export class GptMathAIModelAdapter implements AIModelPort {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: attachment?.mimeType?.startsWith('image/') ? env.openAIVisionModel : env.openAIChatModel,
+        model: attachment?.mimeType?.startsWith('image/') ? env.openAIVisionModel : textModel,
         input,
+        temperature,
       }),
     });
 
@@ -60,10 +75,5 @@ export class GptMathAIModelAdapter implements AIModelPort {
       .join('\n');
 
     return textParts || '';
-  }
-
-  async analyzeClass(input: { content: string; contentType: ClassContentType }): Promise<string> {
-    const prompt = buildClassAnalysisPrompt(input.content, input.contentType);
-    return this.generateText(prompt);
   }
 }

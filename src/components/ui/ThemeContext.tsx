@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
 const STORAGE_KEY = 'APP_THEME_MODE';
@@ -77,14 +77,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .catch(() => undefined);
   }, []);
 
-  const setMode = async (nextMode: AppThemeMode) => {
+  const setMode = useCallback(async (nextMode: AppThemeMode) => {
     setModeState(nextMode);
     await SecureStore.setItemAsync(STORAGE_KEY, nextMode);
-  };
+  }, []);
 
-  const toggleMode = async () => {
+  const toggleMode = useCallback(async () => {
     await setMode(mode === 'dark' ? 'light' : 'dark');
-  };
+  }, [mode, setMode]);
 
   const value = useMemo<AppTheme>(() => {
     const isDark = mode === 'dark';
@@ -95,7 +95,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setMode,
       toggleMode,
     };
-  }, [mode]);
+  }, [mode, setMode, toggleMode]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -44,7 +44,10 @@ export default function HomeDashboardScreen() {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', cargarHome);
-    return unsubscribe;
+
+    return () => {
+      unsubscribe();
+    };
   }, [navigation]);
 
   async function cargarHome() {
@@ -168,14 +171,14 @@ export default function HomeDashboardScreen() {
             </View>
 
             <View style={styles.continueActions}>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => goResumen(continueClass)}>
+              <Pressable style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]} onPress={() => goResumen(continueClass)}>
                 <BookOpen size={16} color={BLUE} />
                 <Text style={styles.secondaryButtonText}>Ver resumen</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButton} onPress={() => goChat(continueClass)}>
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={() => goChat(continueClass)}>
                 <MessageSquare size={16} color="#fff" />
                 <Text style={styles.primaryButtonText}>Preguntar</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         ) : (
@@ -183,10 +186,10 @@ export default function HomeDashboardScreen() {
             <Sparkles color={PURPLE} size={30} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>Aún no hay clases procesadas</Text>
             <Text style={[styles.emptyText, { color: colors.muted }]}>Graba o sube tu primera clase para generar resumen y chat contextual.</Text>
-            <TouchableOpacity style={styles.primaryButtonLarge} onPress={goRecord}>
+            <Pressable style={({ pressed }) => [styles.primaryButtonLarge, pressed && styles.pressed]} onPress={goRecord}>
               <Mic color="#fff" size={18} />
               <Text style={styles.primaryButtonText}>Grabar primera clase</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
 
@@ -195,41 +198,47 @@ export default function HomeDashboardScreen() {
         </View>
 
         <View style={styles.actionsGrid}>
-          <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('Materias')}>
+          <Pressable style={({ pressed }) => [styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]} onPress={() => navigation.navigate('Materias')}>
             <Plus color={BLUE} size={22} />
             <Text style={[styles.actionTitle, { color: colors.text }]}>Nueva materia</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={goRecord}>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]} onPress={goRecord}>
             <Mic color={PURPLE} size={22} />
             <Text style={[styles.actionTitle, { color: colors.text }]}>Grabar clase</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('Chatbot')}>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.actionCard, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]} onPress={() => navigation.navigate('Chatbot')}>
             <MessageSquare color={GREEN} size={22} />
             <Text style={[styles.actionTitle, { color: colors.text }]}>Tutor IA</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Últimas clases</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Materias')}>
+          <Pressable style={({ pressed }) => pressed && styles.pressed} onPress={() => navigation.navigate('Materias')}>
             <Text style={styles.seeAll}>Ver materias</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {filteredClasses.length === 0 ? (
           <Text style={styles.emptyListText}>No hay clases recientes todavía.</Text>
         ) : (
           filteredClasses.slice(0, 5).map((item) => (
-            <TouchableOpacity key={item.note.id} style={[styles.recentCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => goResumen(item)} activeOpacity={0.86}>
+            <Pressable key={item.note.id} style={({ pressed }) => [styles.recentCard, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.cardPressed]} onPress={() => goResumen(item)}>
               <View style={[styles.recentDot, { backgroundColor: item.subject.color || BLUE }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.recentTitle, { color: colors.text }]}>{item.note.title}</Text>
                 <Text style={[styles.recentSubject, { color: colors.muted }]}>{item.subject.name}</Text>
               </View>
-              <TouchableOpacity style={styles.askSmallButton} onPress={() => goChat(item)}>
+              <Pressable
+                style={({ pressed }) => [styles.askSmallButton, pressed && styles.pressed]}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  goChat(item);
+                }}
+              >
                 <MessageSquare color={BLUE} size={16} />
-              </TouchableOpacity>
-            </TouchableOpacity>
+              </Pressable>
+            </Pressable>
           ))
         )}
 
@@ -294,5 +303,7 @@ const styles = StyleSheet.create({
   recentSubject: { color: MUTED, fontWeight: '700', fontSize: 12, marginTop: 2 },
   askSmallButton: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', alignItems: 'center', justifyContent: 'center' },
   emptyListText: { color: MUTED, fontWeight: '700', textAlign: 'center', marginVertical: 14 },
+  pressed: { opacity: 0.72 },
+  cardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
   bottomSpace: { height: 10 },
 });

@@ -50,7 +50,9 @@ export class AskTutorUseCase {
 
     const safeContext = contextText || 'No existe contexto procesado para la clase seleccionada todavía.';
     const history = buildConversationHistory(input.history);
-    const prompt = `${history}${buildTutorPrompt(safeContext, cleanQuestion)}\n\nRegla principal: responde únicamente con base en la clase/tema seleccionado. No uses información de otras clases de la materia. Si el contexto de esta clase no alcanza, dilo claramente.`;
+    const prompt = `${history}${buildTutorPrompt(safeContext, cleanQuestion, {
+      selectedClassTitle: selectedNote?.title,
+    })}`;
 
     const model = this.modelRouter.selectModel(input.contentType || 'general', input.aiProvider);
     const response = await model.generateText(prompt);
@@ -70,7 +72,7 @@ function buildDirectContext(notes: Array<{ title: string; summary?: string | nul
       `CLASE SELECCIONADA ${index + 1}: ${note.title}`,
       note.summary ? `Resumen estructurado:\n${note.summary}` : '',
       transcriptSnippet ? `Transcripción de la clase:\n${transcriptSnippet}` : '',
-    ].filter(Boolean).join('\n');
+    ].flatMap((value) => value ? [value] : []).join('\n');
   }).join('\n\n---\n\n');
 
   return context.slice(0, MAX_CONTEXT_CHARS);

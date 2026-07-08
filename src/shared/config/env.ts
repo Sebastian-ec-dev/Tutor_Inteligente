@@ -1,3 +1,10 @@
+function numberFromEnv(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export const env = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
@@ -8,6 +15,8 @@ export const env = {
   openAISummaryModel: process.env.EXPO_PUBLIC_OPENAI_SUMMARY_MODEL || 'gpt-4.1-mini',
   openAIVisionModel: process.env.EXPO_PUBLIC_OPENAI_VISION_MODEL || 'gpt-4.1-mini',
   openAITranscriptionModel: process.env.EXPO_PUBLIC_OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
+  aiChatTemperature: numberFromEnv(process.env.EXPO_PUBLIC_AI_CHAT_TEMPERATURE, 0.3),
+  aiSummaryTemperature: numberFromEnv(process.env.EXPO_PUBLIC_AI_SUMMARY_TEMPERATURE, 0.2),
   useMockAI: process.env.EXPO_PUBLIC_USE_MOCK_AI === 'true',
 };
 

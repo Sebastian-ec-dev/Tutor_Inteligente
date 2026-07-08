@@ -382,12 +382,17 @@ function parseMarkdownLikeSections(text: string): SummarySection[] {
     { matcher: /conceptos clave/i, title: 'Conceptos clave', accent: '#7C3AED', icon: 'check' },
     { matcher: /puntos importantes/i, title: 'Puntos importantes', accent: '#16A34A', icon: 'check' },
     { matcher: /(posibles preguntas|preguntas de prueba|preguntas de examen)/i, title: 'Preguntas para estudiar', accent: '#F59E0B', icon: 'question' },
+    { matcher: /refuerzo para aprender/i, title: 'Refuerzo para aprender', accent: '#0EA5E9', icon: 'tips' },
+    { matcher: /ejemplos pr[aá]cticos/i, title: 'Ejemplos prácticos', accent: '#22C55E', icon: 'check' },
     { matcher: /tareas detectadas/i, title: 'Tareas detectadas', accent: '#EF4444', icon: 'tasks', emptyMessage: 'No se detectaron tareas.' },
     { matcher: /fecha de entrega detectada/i, title: 'Fecha de entrega', accent: '#0EA5E9', icon: 'calendar', emptyMessage: 'No se detectó fecha de entrega.' },
     { matcher: /recomendaciones de estudio/i, title: 'Recomendaciones de estudio', accent: '#8B5CF6', icon: 'tips' },
   ];
 
-  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const lines = text.split(/\n+/).flatMap((line) => {
+    const trimmed = line.trim();
+    return trimmed ? [trimmed] : [];
+  });
   const sections: Array<SummarySection & { raw: string[] }> = [];
   let current: (SummarySection & { raw: string[] }) | null = null;
 
@@ -428,9 +433,10 @@ function linesToBulletItems(lines: string[]): string[] {
   if (!text) return [];
 
   if (lines.some((line) => /^[-*•]|^\d+[.)]/.test(line.trim()))) {
-    return lines
-      .map((line) => line.replace(/^[-*•]\s*/, '').replace(/^\d+[.)]\s*/, '').trim())
-      .filter(Boolean);
+    return lines.flatMap((line) => {
+      const item = line.replace(/^[-*•]\s*/, '').replace(/^\d+[.)]\s*/, '').trim();
+      return item ? [item] : [];
+    });
   }
 
   return splitIntoStudyBullets(text);
@@ -461,6 +467,8 @@ function buildFallbackSections(sourceText: string, transcript: string, title: st
     { title: 'Conceptos clave', accent: '#7C3AED', icon: 'check', items: conceptosClave.length ? conceptosClave : ['Revisa la transcripción para identificar conceptos principales.'] },
     { title: 'Puntos importantes', accent: '#16A34A', icon: 'check', items: puntosImportantes.length ? puntosImportantes : ['No se detectaron puntos importantes adicionales.'] },
     { title: 'Preguntas para estudiar', accent: '#F59E0B', icon: 'question', items: preguntas },
+    { title: 'Refuerzo para aprender', accent: '#0EA5E9', icon: 'tips', items: ['Relaciona este tema con ejemplos cotidianos y repasa los conceptos que no quedaron claros en la transcripción.'] },
+    { title: 'Ejemplos prácticos', accent: '#22C55E', icon: 'check', items: ['Pide al Tutor IA un ejemplo aplicado sobre esta clase para reforzar el aprendizaje.'] },
     { title: 'Tareas detectadas', accent: '#EF4444', icon: 'tasks', items: [], emptyMessage: 'No se detectaron tareas en esta clase.' },
     { title: 'Recomendaciones de estudio', accent: '#8B5CF6', icon: 'tips', items: ['Repasa primero el resumen general y luego abre la transcripción para profundizar.', 'Usa el botón “Preguntar esta clase” para aclarar dudas solo sobre este tema.', 'Si agregas más audios a la clase, el resumen se actualizará con el nuevo contenido.'] },
   ];
@@ -557,5 +565,5 @@ const styles = StyleSheet.create({
   modalSaveButton: { flex: 1, height: 48, borderRadius: 14, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
   modalCancelText: { color: '#475569', fontWeight: '900' },
   modalSaveText: { color: '#fff', fontWeight: '900' },
-  fab: { position: 'absolute', bottom: 20, right: 20, backgroundColor: '#007AFF', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 5 },
+  fab: { position: 'absolute', bottom: 20, right: 20, backgroundColor: '#007AFF', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.18)' },
 });

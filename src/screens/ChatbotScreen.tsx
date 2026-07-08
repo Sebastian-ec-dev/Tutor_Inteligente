@@ -389,7 +389,7 @@ export default function ChatbotScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              { backgroundColor: colors.primary, shadowColor: colors.primary },
+              { backgroundColor: colors.primary },
               (loading || !inputText.trim() || !materiaId || !classId) && styles.sendButtonDisabled,
             ]}
             onPress={enviarMensaje}
@@ -563,10 +563,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     margin: 2,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
+    boxShadow: '0px 4px 8px rgba(37, 99, 235, 0.24)',
   },
   sendButtonDisabled: {
     opacity: 0.45,
