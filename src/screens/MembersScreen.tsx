@@ -18,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import QRCode from 'react-native-qrcode-svg';
 import { Link, MailPlus, QrCode, Share2, Trash2, UserRoundCog, Users, X } from 'lucide-react-native';
 import LoadingModal from '../components/ui/LoadingModal';
+import AppBottomBar from '../components/ui/AppBottomBar';
 import { PropsList } from '../navigation/AppNavigator';
 import {
   createJoinInviteUseCase,
@@ -353,6 +354,7 @@ export default function MembersScreen() {
         </View>
       </Modal>
 
+      <AppBottomBar activeTab="Materias" subjectId={subjectId} />
       <LoadingModal visible={loading} text="Actualizando integrantes..." />
     </View>
   );

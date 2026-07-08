@@ -2,21 +2,24 @@ import { AIModelPort, AITextPart } from '../../domain/ports/AIModelPort';
 import { ClassContentType } from '../../domain/entities/ClassContentType';
 import { buildClassAnalysisPrompt } from '../../application/promptBuilders';
 import { env } from '../../shared/config/env';
-import { GeminiAIModelAdapter } from './GeminiAIModelAdapter';
 
 export class GptMathAIModelAdapter implements AIModelPort {
   readonly name = 'OpenAI GPT-4.1 mini / modo Light';
 
-  constructor(private readonly fallbackModel: AIModelPort = new GeminiAIModelAdapter()) {}
+  constructor(private readonly fallbackModel?: AIModelPort) {}
 
   async generateText(prompt: string, attachment?: AITextPart): Promise<string> {
     // En Expo se permite probar sin romper el flujo: si no hay clave OpenAI,
     // se usa el adaptador de respaldo. La pantalla sigue entrando por la ruta GPT.
     if (!env.openAIApiKey) {
-      return this.fallbackModel.generateText(
-        `[Ruta OpenAI GPT-4.1 mini / modo Light solicitada. Prioriza razonamiento paso a paso, ejercicios, fórmulas e interpretación visual.]\n\n${prompt}`,
-        attachment,
-      );
+      if (this.fallbackModel) {
+        return this.fallbackModel.generateText(
+          `[Ruta OpenAI GPT-4.1 mini / modo Light solicitada. Prioriza razonamiento paso a paso, ejercicios, fórmulas e interpretación visual.]\n\n${prompt}`,
+          attachment,
+        );
+      }
+
+      throw new Error('Falta configurar EXPO_PUBLIC_OPENAI_API_KEY para usar GPT / OpenAI.');
     }
 
     const input: any[] = [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }];
@@ -35,7 +38,7 @@ export class GptMathAIModelAdapter implements AIModelPort {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: env.openAIMathModel,
+        model: attachment?.mimeType?.startsWith('image/') ? env.openAIVisionModel : env.openAIChatModel,
         input,
       }),
     });

@@ -115,8 +115,8 @@ ${content}
   }
 
   return `${baseRules}
-Ruta IA seleccionada: Google Gemini 2.5 Flash.
-Fortaleza esperada: análisis rápido de clases teóricas, resúmenes conceptuales y organización de apuntes.
+Ruta IA seleccionada: modelo conceptual configurable.
+Fortaleza esperada: análisis de clases teóricas, resúmenes conceptuales y organización de apuntes.
 
 Tipo de contenido: Teórico o general.
 Instrucciones específicas:

@@ -4,14 +4,9 @@ import { env } from '../../shared/config/env';
 export class WhisperTranscriptionAdapter implements TranscriptionPort {
   readonly name = 'OpenAI Whisper / transcriptor de audio';
 
-  constructor(private readonly fallbackTranscriber?: TranscriptionPort) {}
-
   async transcribeAudio(input: { base64Audio: string; mimeType: string }): Promise<string> {
-    // El cliente móvil no debe exponer flujos sensibles de subida directa con claves secretas.
-    // Para prototipo, si no hay API key o si falla la ruta remota, se usa el transcriptor de respaldo.
     if (!env.openAIApiKey) {
-      if (this.fallbackTranscriber) return this.fallbackTranscriber.transcribeAudio(input);
-      throw new Error('OpenAI Whisper requiere EXPO_PUBLIC_OPENAI_API_KEY o un transcriptor de respaldo.');
+      throw new Error('Falta configurar la clave de OpenAI para transcribir audio.');
     }
 
     try {
@@ -63,9 +58,9 @@ export class WhisperTranscriptionAdapter implements TranscriptionPort {
 
       if (textParts.trim()) return textParts;
       throw new Error('La respuesta de transcripción no devolvió texto.');
-    } catch (error) {
-      if (this.fallbackTranscriber) return this.fallbackTranscriber.transcribeAudio(input);
-      throw error;
+    } catch (error: any) {
+      const message = error?.message || String(error);
+      throw new Error(`No se pudo transcribir el audio con OpenAI: ${message}`);
     }
   }
 }

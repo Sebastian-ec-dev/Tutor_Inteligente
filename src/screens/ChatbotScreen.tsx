@@ -1,27 +1,40 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
+  View,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
-import { Send, Paperclip } from 'lucide-react-native';
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  FolderOpen,
+  Paperclip,
+  Send,
+  SlidersHorizontal,
+  Sparkles,
+} from 'lucide-react-native';
 import MessageBubble from '../utils/MessageBubble';
-import { COLORS } from '../components/ui/Colors';
+import AppBottomBar from '../components/ui/AppBottomBar';
+import { useAppTheme } from '../components/ui/ThemeContext';
 import TypingIndicator from '../utils/burbujaEscribiendo';
 import { Subject } from '../domain/entities/Subject';
 import { AudioNote } from '../domain/entities/AudioNote';
 import { ConversationMessage } from '../domain/entities/ConversationMessage';
 import { ClassContentType } from '../domain/entities/ClassContentType';
+import { AIProvider } from '../domain/entities/AIProvider';
 import { askTutorUseCase, listAudioNotesUseCase, listSubjectsUseCase } from '../application/container';
 import { supabase } from '../infrastructure/supabase/supabaseClient';
 import { PropsList } from '../navigation/AppNavigator';
@@ -32,28 +45,39 @@ type ChatMessage = {
   sender: 'user' | 'bot';
 };
 
+function initialBotMessage(classTitle?: string): ChatMessage {
+  return {
+    id: '1',
+    text: classTitle
+      ? `¡Listo! Pregúntame sobre la clase "${classTitle}". Usaré solo el resumen y la transcripción de ese tema.`
+      : '¡Hola! Soy tu tutor de IA. Primero selecciona una materia y una clase. La configuración básica está activa para ahorrar consumo.',
+    sender: 'bot',
+  };
+}
+
 export default function ChatbotScreen() {
   const route = useRoute<RouteProp<PropsList, 'Chatbot'>>();
   const initialSubjectId = route.params?.subjectId || '';
   const initialClassId = route.params?.classId || '';
   const flatListRef = useRef<FlatList>(null);
+  const appTheme = useAppTheme();
+  const colors = appTheme.colors;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      text: '¡Hola! Soy tu tutor de IA. Selecciona una materia y luego una clase/tema para consultar solo ese contenido.',
-      sender: 'bot',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([initialBotMessage(route.params?.className)]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const [materia, setMateria] = useState<Subject[]>([]);
+  const [materias, setMaterias] = useState<Subject[]>([]);
   const [materiaId, setMateriaId] = useState<string>(initialSubjectId);
   const [clases, setClases] = useState<AudioNote[]>([]);
   const [classId, setClassId] = useState<string>(initialClassId);
+
+  // Configuración básica por defecto para una nueva charla.
+  // No consume IA hasta que el usuario envía una pregunta.
   const [contentType, setContentType] = useState<ClassContentType>('general');
+  const [aiProvider, setAiProvider] = useState<AIProvider>('gemini');
 
   useEffect(() => {
     leerMaterias();
@@ -75,27 +99,18 @@ export default function ChatbotScreen() {
   useEffect(() => {
     const selectedClass = clases.find((item) => item.id === classId);
     if (!materiaId) return;
-
-    setMessages([
-      {
-        id: '1',
-        text: selectedClass
-          ? `¡Listo! Pregúntame sobre la clase "${selectedClass.title}". El sistema usará solo el resumen y la transcripción de ese tema.`
-          : 'Selecciona una clase/tema de esta materia antes de preguntar. Así el chat no revisará toda la materia.',
-        sender: 'bot',
-      },
-    ]);
+    setMessages([initialBotMessage(selectedClass?.title)]);
   }, [classId, clases, materiaId]);
 
   async function leerMaterias() {
     try {
       const data = await listSubjectsUseCase.execute();
-      setMateria(data);
+      setMaterias(data);
       if (!materiaId && data.length > 0) {
         setMateriaId(data[0].id);
       }
     } catch (error) {
-      console.error('Error cargando materias:', error);
+      console.log('Error cargando materias:', error);
     }
   }
 
@@ -112,16 +127,23 @@ export default function ChatbotScreen() {
 
       setClassId(data[0]?.id || '');
     } catch (error) {
-      console.error('Error cargando clases:', error);
+      console.log('Error cargando clases:', error);
       setClases([]);
       setClassId('');
     }
   }
 
+  function nuevaCharlaBasica() {
+    setAiProvider('gemini');
+    setContentType('general');
+    setSettingsOpen(false);
+    const selectedClass = clases.find((item) => item.id === classId);
+    setMessages([initialBotMessage(selectedClass?.title)]);
+  }
 
   async function adjuntarArchivo() {
     if (!materiaId || !classId) {
-      Alert.alert('Selecciona una clase', 'Primero selecciona la materia y la clase/tema para asociar el archivo al chat.');
+      Alert.alert('Selecciona una clase', 'Primero selecciona la materia y la clase o tema para asociar el archivo al chat.');
       return;
     }
 
@@ -142,12 +164,10 @@ export default function ChatbotScreen() {
       const safeName = (asset.name || 'archivo').replace(/[^a-zA-Z0-9_.-]/g, '_');
       const storagePath = `${materiaId}/${classId}/${Date.now()}_${safeName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('chat-uploads')
-        .upload(storagePath, decode(base64), {
-          contentType: asset.mimeType || 'application/octet-stream',
-          upsert: false,
-        });
+      const { error: uploadError } = await supabase.storage.from('chat-uploads').upload(storagePath, decode(base64), {
+        contentType: asset.mimeType || 'application/octet-stream',
+        upsert: false,
+      });
 
       if (uploadError) throw new Error(uploadError.message);
 
@@ -185,7 +205,7 @@ export default function ChatbotScreen() {
   async function enviarMensaje() {
     if (!inputText.trim() || loading) return;
     if (!materiaId || !classId) {
-      Alert.alert('Selecciona una clase', 'Escoge primero la materia y la clase/tema para que el chat use solo ese contexto.');
+      Alert.alert('Selecciona una clase', 'Escoge primero la materia y la clase o tema para que el chat use solo ese contexto.');
       return;
     }
 
@@ -212,6 +232,7 @@ export default function ChatbotScreen() {
         classId,
         history,
         contentType,
+        aiProvider,
       });
 
       const botMessage: ChatMessage = {
@@ -221,12 +242,12 @@ export default function ChatbotScreen() {
       };
       setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
-      console.error(err);
+      console.log('Error procesando pregunta:', err);
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
-          text: 'Hubo un error al procesar tu pregunta.',
+          text: 'El servicio de IA no pudo responder ahora. Revisa tus créditos, conexión o cambia de proveedor en la configuración.',
           sender: 'bot',
         },
       ]);
@@ -235,122 +256,99 @@ export default function ChatbotScreen() {
     }
   }
 
+  const selectedSubject = materias.find((item) => item.id === materiaId);
+  const selectedClass = clases.find((item) => item.id === classId);
+  const providerLabel = aiProvider === 'openai' ? 'GPT / OpenAI' : 'Gemini';
+
   return (
-    <View style={styles.container}>
-      <View style={styles.pickerContainer}>
-        <Text style={styles.pickerLabel}>Materia:</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            selectedValue={materiaId}
-            onValueChange={(itemValue) => setMateriaId(itemValue)}
-            style={styles.picker}
-            dropdownIconColor={COLORS.primary}
-          >
-            {materia.length === 0 && (
-              <Picker.Item
-                label="No hay materias disponibles"
-                value=""
-                color="#999"
-              />
-            )}
-            {materia.map((sub) => (
-              <Picker.Item key={sub.id} label={sub.name} value={sub.id} />
-            ))}
-          </Picker>
-        </View>
-      </View>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+      <View style={[styles.topPanel, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={styles.topTitleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.screenTitle, { color: colors.text }]}>Tutor IA por clase</Text>
+            <Text style={[styles.screenSubtitle, { color: colors.muted }]}>Contexto exacto y modo básico por defecto.</Text>
+          </View>
 
-      <View style={styles.pickerContainerSecondary}>
-        <Text style={styles.pickerLabel}>Clase:</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            selectedValue={classId}
-            onValueChange={(itemValue) => setClassId(itemValue)}
-            style={styles.picker}
-            dropdownIconColor={COLORS.primary}
-          >
-            {clases.length === 0 && (
-              <Picker.Item
-                label="No hay clases procesadas"
-                value=""
-                color="#999"
-              />
-            )}
-            {clases.map((item) => (
-              <Picker.Item key={item.id} label={item.title} value={item.id} />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      <View style={styles.pickerContainerSecondary}>
-        <Text style={styles.pickerLabel}>Ruta IA:</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            selectedValue={contentType}
-            onValueChange={(value) => setContentType(value)}
-            style={styles.picker}
-            dropdownIconColor={COLORS.primary}
-          >
-            <Picker.Item label="General · Google Gemini Flash · mejor para respuestas rápidas" value="general" />
-            <Picker.Item label="Teoría · Google Gemini Flash · mejor para conceptos y resúmenes" value="theory" />
-            <Picker.Item label="Matemática · OpenAI GPT-4.1 Light · mejor para razonamiento paso a paso" value="math" />
-            <Picker.Item label="Imágenes · OpenAI GPT-4.1 Light · mejor para lectura visual" value="image" />
-          </Picker>
-        </View>
-      </View>
-
-      <View style={styles.inputWrapper}>
-        <View
-          style={[
-            styles.inputContainer,
-            inputFocused && styles.inputContainerFocused,
-          ]}
-        >
           <TouchableOpacity
-            style={styles.attachButton}
-            onPress={adjuntarArchivo}
-            disabled={!materiaId || !classId || loading}
+            style={[styles.configButton, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}
+            onPress={() => setSettingsOpen((value) => !value)}
+            activeOpacity={0.85}
           >
-            <Paperclip color={materiaId && classId ? COLORS.primary : '#94A3B8'} size={21} />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.input}
-            placeholder={
-              !materiaId
-                ? 'Selecciona una materia primero...'
-                : !classId
-                  ? 'Selecciona una clase/tema primero...'
-                  : 'Escribe tu pregunta aquí...'
-            }
-            value={inputText}
-            onChangeText={setInputText}
-            onFocus={() => setInputFocused(true)}
-            onBlur={() => setInputFocused(false)}
-            multiline
-            maxLength={600}
-            placeholderTextColor={COLORS.placeholder}
-            editable={!!materiaId && !!classId}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (loading || !inputText.trim() || !materiaId || !classId) &&
-                styles.sendButtonDisabled,
-            ]}
-            onPress={enviarMensaje}
-            disabled={loading || !inputText.trim() || !materiaId || !classId}
-            activeOpacity={0.75}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Send color="#fff" size={22} strokeWidth={2.5} />
-            )}
+            <SlidersHorizontal color={colors.primary} size={17} />
+            <Text style={[styles.configButtonText, { color: colors.primary }]}>Configurar</Text>
+            {settingsOpen ? <ChevronUp color={colors.primary} size={16} /> : <ChevronDown color={colors.primary} size={16} />}
           </TouchableOpacity>
         </View>
-        {inputText.length > 500 && (
-          <Text style={styles.charCount}>{inputText.length}/600</Text>
+
+        <View style={styles.selectionRow}>
+          <View style={[styles.selectionChip, { backgroundColor: colors.chip, borderColor: colors.border }]}>
+            <BookOpen size={14} color={colors.primary} />
+            <Text style={[styles.selectionChipText, { color: colors.text }]} numberOfLines={1}>{selectedSubject?.name || 'Sin materia'}</Text>
+          </View>
+          <View style={[styles.selectionChip, styles.classChip, { backgroundColor: colors.chip, borderColor: colors.border }]}>
+            <FolderOpen size={14} color={colors.purple} />
+            <Text style={[styles.selectionChipText, { color: colors.text }]} numberOfLines={1}>{selectedClass?.title || 'Sin clase'}</Text>
+          </View>
+          <View style={[styles.selectionChip, { backgroundColor: colors.chip, borderColor: colors.border }]}>
+            <Sparkles size={14} color={colors.success} />
+            <Text style={[styles.selectionChipText, { color: colors.text }]} numberOfLines={1}>{providerLabel} · {contentType}</Text>
+          </View>
+        </View>
+
+        {settingsOpen && (
+          <View style={[styles.configPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.pickerContainer}>
+              <Text style={[styles.pickerLabel, { color: colors.text }]}>Materia</Text>
+              <View style={[styles.pickerWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                <Picker selectedValue={materiaId} onValueChange={(itemValue) => setMateriaId(itemValue)} style={[styles.picker, { color: colors.text }]} dropdownIconColor={colors.primary}>
+                  {materias.length === 0 && <Picker.Item label="No hay materias disponibles" value="" color="#999" />}
+                  {materias.map((sub) => <Picker.Item key={sub.id} label={sub.name} value={sub.id} />)}
+                </Picker>
+              </View>
+            </View>
+
+            <View style={styles.pickerContainerSecondary}>
+              <Text style={[styles.pickerLabel, { color: colors.text }]}>Clase o tema</Text>
+              <View style={[styles.pickerWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                <Picker selectedValue={classId} onValueChange={(itemValue) => setClassId(itemValue)} style={[styles.picker, { color: colors.text }]} dropdownIconColor={colors.primary}>
+                  {clases.length === 0 && <Picker.Item label="No hay clases procesadas" value="" color="#999" />}
+                  {clases.map((item) => <Picker.Item key={item.id} label={item.title} value={item.id} />)}
+                </Picker>
+              </View>
+            </View>
+
+            <View style={styles.twoColumns}>
+              <View style={styles.column}>
+                <Text style={[styles.pickerLabel, { color: colors.text }]}>Proveedor IA</Text>
+                <View style={[styles.pickerWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                  <Picker selectedValue={aiProvider} onValueChange={(value) => setAiProvider(value)} style={[styles.picker, { color: colors.text }]} dropdownIconColor={colors.primary}>
+                    <Picker.Item label="Gemini · básico" value="gemini" />
+                    <Picker.Item label="GPT / OpenAI" value="openai" />
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={styles.column}>
+                <Text style={[styles.pickerLabel, { color: colors.text }]}>Modo</Text>
+                <View style={[styles.pickerWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                  <Picker selectedValue={contentType} onValueChange={(value) => setContentType(value)} style={[styles.picker, { color: colors.text }]} dropdownIconColor={colors.primary}>
+                    <Picker.Item label="General" value="general" />
+                    <Picker.Item label="Teoría" value="theory" />
+                    <Picker.Item label="Matemática" value="math" />
+                    <Picker.Item label="Imágenes/doc." value="image" />
+                  </Picker>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity style={[styles.basicButton, { backgroundColor: colors.primarySoft }]} onPress={nuevaCharlaBasica}>
+              <Text style={[styles.basicButtonText, { color: colors.primary }]}>Nueva charla básica para ahorrar tokens</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -358,10 +356,9 @@ export default function ChatbotScreen() {
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
-        onContentSizeChange={() =>
-          flatListRef.current?.scrollToEnd({ animated: true })
-        }
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         contentContainerStyle={styles.list}
+        style={styles.chatList}
         renderItem={({ item, index }) => {
           const next = messages[index + 1];
           const isLastInGroup = !next || next.sender !== item.sender;
@@ -369,79 +366,176 @@ export default function ChatbotScreen() {
         }}
         ListFooterComponent={loading ? <TypingIndicator /> : null}
       />
-    </View>
+
+      <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <View style={[styles.inputContainer, { backgroundColor: colors.input }, inputFocused && { borderColor: colors.primary, backgroundColor: colors.surface }]}>
+          <TouchableOpacity style={[styles.attachButton, { backgroundColor: colors.primarySoft }]} onPress={adjuntarArchivo} disabled={!materiaId || !classId || loading}>
+            <Paperclip color={materiaId && classId ? colors.primary : '#94A3B8'} size={21} />
+          </TouchableOpacity>
+
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder={!materiaId ? 'Selecciona una materia primero...' : !classId ? 'Selecciona una clase o tema primero...' : 'Escribe tu pregunta aquí...'}
+            value={inputText}
+            onChangeText={setInputText}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            multiline
+            maxLength={600}
+            placeholderTextColor={colors.muted}
+            editable={!!materiaId && !!classId}
+          />
+
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              { backgroundColor: colors.primary, shadowColor: colors.primary },
+              (loading || !inputText.trim() || !materiaId || !classId) && styles.sendButtonDisabled,
+            ]}
+            onPress={enviarMensaje}
+            disabled={loading || !inputText.trim() || !materiaId || !classId}
+            activeOpacity={0.75}
+          >
+            {loading ? <ActivityIndicator color="#fff" size="small" /> : <Send color="#fff" size={22} strokeWidth={2.5} />}
+          </TouchableOpacity>
+        </View>
+        {inputText.length > 500 && <Text style={[styles.charCount, { color: colors.muted }]}>{inputText.length}/600</Text>}
+      </View>
+
+      <AppBottomBar activeTab="Chatbot" subjectId={materiaId} />
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
+  container: { flex: 1 },
+  topPanel: {
+    paddingHorizontal: 15,
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
   },
-
-  pickerContainer: {
+  topTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    gap: 10,
+  },
+  screenTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  screenSubtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  configButton: {
+    minHeight: 38,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  configButtonText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  selectionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  selectionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    maxWidth: 150,
+  },
+  classChip: {
+    maxWidth: 230,
+  },
+  selectionChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  configPanel: {
+    marginTop: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+  },
+  pickerContainer: {
+    marginTop: 0,
   },
   pickerContainerSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    marginTop: 10,
   },
   pickerLabel: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginRight: 10,
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 6,
   },
   pickerWrapper: {
-    flex: 1,
-    backgroundColor: COLORS.inputBg,
-    borderRadius: 10,
-    height: 40,
+    borderRadius: 14,
+    minHeight: 48,
     justifyContent: 'center',
     overflow: 'hidden',
+    borderWidth: 1,
   },
   picker: {
     width: '100%',
-    height: 100,
-    color: COLORS.text,
   },
-
-  inputWrapper: {
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    paddingVertical: 12,
+  twoColumns: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  column: {
+    flex: 1,
+  },
+  basicButton: {
+    marginTop: 12,
+    minHeight: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  basicButtonText: {
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  chatList: {
+    flex: 1,
+  },
+  list: {
+    paddingHorizontal: 15,
+    paddingTop: 14,
+    paddingBottom: 10,
+    flexGrow: 1,
+  },
+  inputWrapper: {
+    borderTopWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 10,
-    backgroundColor: COLORS.inputBg,
     borderRadius: 26,
     borderWidth: 1.5,
     borderColor: 'transparent',
     paddingLeft: 4,
-  },
-  inputContainerFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.surface,
   },
   input: {
     flex: 1,
@@ -453,7 +547,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     maxHeight: 130,
     minHeight: 52,
-    color: COLORS.text,
   },
   attachButton: {
     width: 42,
@@ -461,19 +554,15 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
     marginRight: 6,
   },
-
   sendButton: {
-    backgroundColor: COLORS.primary,
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     margin: 2,
-    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
@@ -484,16 +573,8 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 11,
-    color: COLORS.placeholder,
     textAlign: 'right',
     marginTop: 4,
     marginRight: 4,
-  },
-
-  list: {
-    padding: 15,
-    paddingTop: 20,
-    paddingBottom: 8,
-    flexGrow: 1,
   },
 });

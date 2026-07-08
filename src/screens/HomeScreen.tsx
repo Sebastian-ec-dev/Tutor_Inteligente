@@ -15,6 +15,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PropsList } from '../navigation/AppNavigator';
 import { BookOpen, Plus, LogOut, MessageSquare, Search, X, Mic, ChevronRight, Brain, UserRound, Pencil, Trash2, Users, QrCode } from 'lucide-react-native';
 import LoadingModal from '../components/ui/LoadingModal';
+import AppBottomBar from '../components/ui/AppBottomBar';
+import { useAppTheme } from '../components/ui/ThemeContext';
 import { Subject } from '../domain/entities/Subject';
 import {
   createSubjectUseCase,
@@ -60,6 +62,8 @@ export default function HomeScreen() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState('');
+  const appTheme = useAppTheme();
+  const colors = appTheme.colors;
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
 
   useEffect(() => {
@@ -198,7 +202,7 @@ export default function HomeScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() =>
           navigation.navigate('Resumen', {
             subjectId: item.id,
@@ -212,9 +216,9 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardSubtitle}>{item.teacher || 'Docente no definido'}</Text>
-          {!!item.description && <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>}
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.muted }]}>{item.teacher || 'Docente no definido'}</Text>
+          {!!item.description && <Text style={[styles.cardDescription, { color: colors.muted }]} numberOfLines={2}>{item.description}</Text>}
           <View style={styles.badgesRow}>
             <Text style={styles.badgeMuted}>Tutor IA activo</Text>
             <Text style={styles.badgeBlue}>Contexto directo</Text>
@@ -241,12 +245,12 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerPanel}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.headerPanel, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.greeting}>Hola{displayName ? `, ${displayName}` : ''} 👋</Text>
-            <Text style={styles.headerSubtitle}>¿Qué clase quieres estudiar hoy?</Text>
+            <Text style={[styles.greeting, { color: colors.text }]}>Hola{displayName ? `, ${displayName}` : ''} 👋</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.muted }]}>Administra tus materias y aulas</Text>
           </View>
           <View style={styles.headerButtons}>
             <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate('Profile')}>
@@ -258,22 +262,15 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.searchBox}>
+        <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Search size={17} color={MUTED} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Buscar materia, docente o descripción..."
             value={search}
             onChangeText={setSearch}
-            placeholderTextColor={MUTED}
+            placeholderTextColor={colors.muted}
           />
-        </View>
-
-        <View style={styles.statsGrid}>
-          <StatCard value={String(materias.length)} label="Materias" color={BLUE} />
-          <StatCard value="IA" label="Router" color={PURPLE} />
-          <StatCard value="CTX" label="Chat directo" color={GREEN} />
-          <StatCard value="OK" label="Privacidad" color={ORANGE} />
         </View>
       </View>
 
@@ -282,26 +279,26 @@ export default function HomeScreen() {
           <Plus color="#fff" size={18} />
           <Text style={styles.primaryActionText}>Crear materia</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('Chatbot')}>
+        <TouchableOpacity style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('Chatbot')}>
           <MessageSquare color={PURPLE} size={18} />
           <Text style={styles.secondaryActionText}>Tutor IA</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('JoinSubject')}>
+        <TouchableOpacity style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('JoinSubject')}>
           <QrCode color={PURPLE} size={18} />
           <Text style={styles.secondaryActionText}>Unirme</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Mis materias</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Mis materias</Text>
         <Text style={styles.sectionCounter}>{filteredMaterias.length} visibles</Text>
       </View>
 
       {filteredMaterias.length === 0 ? (
-        <View style={styles.emptyBox}>
+        <View style={[styles.emptyBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <BookOpen color={MUTED} size={42} />
-          <Text style={styles.emptyTitle}>No hay materias todavía</Text>
-          <Text style={styles.emptyText}>Crea una materia para guardar audios, resúmenes y chats por usuario.</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No hay materias todavía</Text>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>Crea una materia para guardar audios, resúmenes y chats por usuario.</Text>
           <TouchableOpacity style={styles.emptyButton} onPress={abrirFormulario}>
             <Plus color="#fff" size={18} />
             <Text style={styles.emptyButtonText}>Crear primera materia</Text>
@@ -400,26 +397,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bottomItemActive}>
-          <BookOpen color={BLUE} size={20} />
-          <Text style={styles.bottomActiveText}>Materias</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.recordButton} onPress={() => {
-          if (materias[0]?.id) navigation.navigate('Audio', { subjectId: materias[0].id });
-          else Alert.alert('Primero crea una materia', 'Necesitas una materia para subir o procesar un audio.');
-        }}>
-          <Mic color="#fff" size={24} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomItem} onPress={() => navigation.navigate('Chatbot')}>
-          <Brain color={MUTED} size={20} />
-          <Text style={styles.bottomText}>Tutor IA</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.bottomItem} onPress={() => navigation.navigate('Profile')}>
-          <UserRound color={MUTED} size={20} />
-          <Text style={styles.bottomText}>Perfil</Text>
-        </TouchableOpacity>
-      </View>
+      <AppBottomBar activeTab="Materias" subjectId={materias[0]?.id} />
 
       <LoadingModal visible={loading} text="Procesando..." />
     </View>

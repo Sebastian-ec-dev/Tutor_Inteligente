@@ -1,5 +1,6 @@
 import { ClassContentType } from '../../../domain/entities/ClassContentType';
 import { ConversationMessage } from '../../../domain/entities/ConversationMessage';
+import { AIProvider } from '../../../domain/entities/AIProvider';
 import { AuthRepositoryPort } from '../../../domain/ports/AuthRepositoryPort';
 import { AudioNoteRepositoryPort } from '../../../domain/ports/AudioNoteRepositoryPort';
 import { AIModelRouterPort } from '../../../domain/ports/AIModelRouterPort';
@@ -22,6 +23,7 @@ export class AskTutorUseCase {
     subjectId: string;
     history: ConversationMessage[];
     contentType?: ClassContentType;
+    aiProvider?: AIProvider;
     classId?: string;
   }): Promise<string> {
     const question = input.question.trim();
@@ -50,7 +52,7 @@ export class AskTutorUseCase {
     const history = buildConversationHistory(input.history);
     const prompt = `${history}${buildTutorPrompt(safeContext, cleanQuestion)}\n\nRegla principal: responde únicamente con base en la clase/tema seleccionado. No uses información de otras clases de la materia. Si el contexto de esta clase no alcanza, dilo claramente.`;
 
-    const model = this.modelRouter.selectModel(input.contentType || 'general');
+    const model = this.modelRouter.selectModel(input.contentType || 'general', input.aiProvider);
     const response = await model.generateText(prompt);
 
     return this.privacyFilter.clean(response || 'Lo siento, no pude generar una respuesta.');

@@ -8,11 +8,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Switch,
 } from 'react-native';
-import { User, Save, Users, Mail, GraduationCap, BookOpen, QrCode } from 'lucide-react-native';
+import { User, Save, Users, Mail, GraduationCap, BookOpen, QrCode, Moon, Sun } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LoadingModal from '../components/ui/LoadingModal';
+import AppBottomBar from '../components/ui/AppBottomBar';
+import { useAppTheme } from '../components/ui/ThemeContext';
 import { PropsList } from '../navigation/AppNavigator';
 import { UserProfile } from '../domain/entities/Profile';
 import { SubjectMembership, CLASSROOM_ROLE_LABELS } from '../domain/entities/ClassroomMember';
@@ -29,6 +32,7 @@ const TEXT = '#0F172A';
 const MUTED = '#64748B';
 const BORDER = '#E2E8F0';
 const GREEN = '#22C55E';
+const ORANGE = '#F59E0B';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
@@ -37,6 +41,17 @@ export default function ProfileScreen() {
   const [university, setUniversity] = useState('');
   const [memberships, setMemberships] = useState<SubjectMembership[]>([]);
   const [loading, setLoading] = useState(false);
+  const appTheme = useAppTheme();
+  const darkMode = appTheme.isDark;
+  const colors = appTheme.colors;
+  const theme = {
+    bg: colors.background,
+    card: colors.card,
+    soft: colors.soft,
+    text: colors.text,
+    muted: colors.muted,
+    border: colors.border,
+  };
 
   useEffect(() => {
     cargarPerfil();
@@ -74,19 +89,20 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.heroCard}>
+    <View style={[styles.screen, { backgroundColor: theme.bg }]}> 
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.bg }]}>
+      <View style={[styles.heroCard, { backgroundColor: theme.soft, borderColor: theme.border }]}>
         <View style={styles.avatar}>
           <User color="#fff" size={30} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroTitle}>{displayName || 'Mi perfil'}</Text>
-          <Text style={styles.heroSubtitle}>{profile?.email || 'Correo no disponible'}</Text>
+          <Text style={[styles.heroTitle, { color: theme.text }]}>{displayName || 'Mi perfil'}</Text>
+          <Text style={[styles.heroSubtitle, { color: theme.muted }]}>{profile?.email || 'Correo no disponible'}</Text>
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Datos personales</Text>
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Datos personales</Text>
 
         <View style={styles.fieldHeader}>
           <User color={MUTED} size={16} />
@@ -123,10 +139,32 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.titleRow}>
+          {darkMode ? <Moon color={BLUE} size={19} /> : <Sun color={ORANGE} size={19} />}
+          <Text style={[styles.sectionTitleNoMargin, { color: theme.text }]}>Descanso visual</Text>
+        </View>
+        <Text style={[styles.helperText, { color: theme.muted }]}>
+          Activa el modo noche para reducir brillo cuando estudies por la noche.
+        </Text>
+        <View style={[styles.settingRow, { backgroundColor: theme.soft, borderColor: theme.border }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.settingTitle, { color: theme.text }]}>Modo noche</Text>
+            <Text style={[styles.settingSubtitle, { color: theme.muted }]}>Interfaz más oscura para descansar la vista.</Text>
+          </View>
+          <Switch
+            value={darkMode}
+            onValueChange={appTheme.toggleMode}
+            thumbColor={darkMode ? BLUE : '#F8FAFC'}
+            trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+          />
+        </View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.titleRow}>
           <Users color={PURPLE} size={19} />
-          <Text style={styles.sectionTitleNoMargin}>Aulas, amigos y roles</Text>
+          <Text style={[styles.sectionTitleNoMargin, { color: theme.text }]}>Aulas, amigos y roles</Text>
         </View>
         <Text style={styles.helperText}>
           Aquí ves las materias compartidas donde participas. Los amigos/integrantes se agregan desde la opción “Integrantes” dentro de cada materia.
@@ -160,12 +198,15 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      </ScrollView>
+      <AppBottomBar activeTab="Profile" />
       <LoadingModal visible={loading} text="Cargando perfil..." />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   container: { flexGrow: 1, backgroundColor: BG, padding: 16, paddingBottom: 30 },
   heroCard: {
     backgroundColor: '#EEF2FF',
@@ -201,4 +242,7 @@ const styles = StyleSheet.create({
   subjectDot: { width: 12, height: 36, borderRadius: 10 },
   membershipTitle: { color: TEXT, fontWeight: '900', fontSize: 14 },
   membershipRole: { color: GREEN, fontWeight: '900', fontSize: 11, marginTop: 2 },
+  settingRow: { borderRadius: 16, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  settingTitle: { fontWeight: '900', fontSize: 14 },
+  settingSubtitle: { fontWeight: '600', fontSize: 12, marginTop: 3, maxWidth: 200 },
 });

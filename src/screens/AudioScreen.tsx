@@ -16,7 +16,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PropsList } from '../navigation/AppNavigator';
 import { Upload, CheckCircle, Brain, Mic, Sparkles, Square, Clock, Pause, Play } from 'lucide-react-native';
 import LoadingModal from '../components/ui/LoadingModal';
+import AppBottomBar from '../components/ui/AppBottomBar';
+import { useAppTheme } from '../components/ui/ThemeContext';
 import { ClassContentType, CLASS_CONTENT_LABELS } from '../domain/entities/ClassContentType';
+import { AIProvider, AI_PROVIDER_LABELS } from '../domain/entities/AIProvider';
 import { AI_MODEL_CAPABILITIES, getModelCapabilityByContentType } from '../domain/entities/AIModelCapability';
 import { processAudioNoteUseCase } from '../application/container';
 import { env } from '../shared/config/env';
@@ -36,6 +39,8 @@ export default function AudioRecorderScreen() {
   const route = useRoute<RouteProp<PropsList, 'Audio'>>();
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
   const { subjectId, audioNoteId, audioNoteTitle } = route.params;
+  const appTheme = useAppTheme();
+  const colors = appTheme.colors;
   const isAppendingToClass = !!audioNoteId;
 
   const [titulo, setTitulo] = useState(audioNoteTitle || '');
@@ -43,6 +48,7 @@ export default function AudioRecorderScreen() {
   const [audioName, setAudioName] = useState<string>('');
   const [mimeType, setMimeType] = useState('audio/m4a');
   const [contentType, setContentType] = useState<ClassContentType>('theory');
+  const [analysisProvider, setAnalysisProvider] = useState<AIProvider>('gemini');
   const [loading, setLoading] = useState(false);
   const [textLoading, setTextLoading] = useState<string>('');
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -51,7 +57,7 @@ export default function AudioRecorderScreen() {
   const [seconds, setSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const selectedCapability = useMemo(() => getModelCapabilityByContentType(contentType), [contentType]);
+  const selectedCapability = useMemo(() => getModelCapabilityByContentType(contentType, analysisProvider), [contentType, analysisProvider]);
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -179,6 +185,7 @@ export default function AudioRecorderScreen() {
         audioUri: audioUri || '',
         mimeType,
         contentType,
+        aiProvider: analysisProvider,
         onProgress: setTextLoading,
       });
       Alert.alert(
@@ -197,7 +204,8 @@ export default function AudioRecorderScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.heroCard}>
         <View style={styles.heroIcon}>
           <Brain color="#fff" size={26} />
@@ -212,12 +220,12 @@ export default function AudioRecorderScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>1. Datos de la clase</Text>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>1. Datos de la clase</Text>
 
-        <Text style={styles.label}>Nombre de la clase/tema</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>Nombre de la clase/tema</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.text }]}
           placeholder="Ej. Test 1 - Normalización"
           value={titulo}
           onChangeText={setTitulo}
@@ -229,8 +237,8 @@ export default function AudioRecorderScreen() {
             : 'Puedes escribir el nombre manualmente. Si lo dejas vacío, la app generará un título automático con base en el resumen o la transcripción.'}
         </Text>
 
-        <Text style={styles.label}>Tipo de contenido académico</Text>
-        <View style={styles.pickerWrapper}>
+        <Text style={[styles.label, { color: colors.muted }]}>Tipo de contenido académico</Text>
+        <View style={[styles.pickerWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
           <Picker
             selectedValue={contentType}
             onValueChange={(value) => setContentType(value)}
@@ -241,7 +249,7 @@ export default function AudioRecorderScreen() {
               return (
                 <Picker.Item
                   key={option}
-                  label={`${CLASS_CONTENT_LABELS[option]} · ${model.provider} ${model.modelName}`}
+                  label={CLASS_CONTENT_LABELS[option]}
                   value={option}
                 />
               );
@@ -249,22 +257,35 @@ export default function AudioRecorderScreen() {
           </Picker>
         </View>
 
-        <View style={styles.selectedModelCard}>
-          <View style={styles.selectedModelHeader}>
-            <Sparkles color={PURPLE} size={18} />
-            <Text style={styles.selectedModelTitle}>{selectedCapability.provider} {selectedCapability.modelName}</Text>
-          </View>
-          <Text style={styles.selectedModelText}>Mejor para: {selectedCapability.bestFor}</Text>
-          <Text style={styles.selectedModelText}>Uso dentro de la app: {selectedCapability.usedWhen}</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>Modelo para resumen y análisis</Text>
+        <View style={[styles.pickerWrapper, { backgroundColor: colors.input, borderColor: colors.border }]}>
+          <Picker
+            selectedValue={analysisProvider}
+            onValueChange={(value) => setAnalysisProvider(value)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Gemini · rápido para teoría y organización" value="gemini" />
+            <Picker.Item label="GPT / OpenAI · mejor para razonamiento, imágenes y documentos" value="openai" />
+          </Picker>
         </View>
 
-        <Text style={styles.sectionTitle}>2. Audio de la clase</Text>
+        <View style={[styles.selectedModelCard, { backgroundColor: colors.soft, borderColor: colors.border }]}>
+          <View style={styles.selectedModelHeader}>
+            <Sparkles color={PURPLE} size={18} />
+            <Text style={[styles.selectedModelTitle, { color: colors.text }]}>{selectedCapability.provider} {selectedCapability.modelName}</Text>
+          </View>
+          <Text style={[styles.selectedModelText, { color: colors.muted }]}>Mejor para: {selectedCapability.bestFor}</Text>
+          <Text style={[styles.selectedModelText, { color: colors.muted }]}>Uso dentro de la app: {selectedCapability.usedWhen}</Text>
+          <Text style={[styles.selectedModelText, { color: colors.muted }]}>Nota: la transcripción del audio siempre usa OpenAI gpt-4o-mini-transcribe por costo.</Text>
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>2. Audio de la clase</Text>
         <View style={styles.transcriptionCard}>
           <Mic color={BLUE} size={19} />
           <View style={{ flex: 1 }}>
             <Text style={styles.transcriptionTitle}>OpenAI Whisper / transcriptor de audio</Text>
             <Text style={styles.transcriptionText}>
-              Mejor para convertir grabaciones en texto. Si no hay API configurada, el proyecto usa el transcriptor de respaldo o Mock AI para pruebas.
+              La conversión de audio a texto usa solo OpenAI gpt-4o-mini-transcribe por ser la opción económica para transcripción. El resumen y el chat pueden usar Gemini o GPT según selecciones.
             </Text>
           </View>
         </View>
@@ -331,7 +352,7 @@ export default function AudioRecorderScreen() {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>3. Modelos disponibles</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>3. Modelos disponibles</Text>
         <View style={styles.modelList}>
           {AI_MODEL_CAPABILITIES.map((item) => (
             <View key={item.id} style={styles.modelCard}>
@@ -361,12 +382,15 @@ export default function AudioRecorderScreen() {
           <Text style={styles.submitText}>{isAppendingToClass ? 'Agregar audio a esta clase' : 'Procesar y guardar clase'}</Text>
         </TouchableOpacity>
       </View>
-      <LoadingModal visible={loading} text={textLoading} />
-    </ScrollView>
+        <LoadingModal visible={loading} text={textLoading} />
+      </ScrollView>
+      <AppBottomBar activeTab="Audio" subjectId={subjectId} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: BG },
   container: {
     flexGrow: 1,
     backgroundColor: BG,

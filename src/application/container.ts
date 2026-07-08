@@ -8,7 +8,6 @@ import { SupabaseClassroomMemberRepository } from '../infrastructure/supabase/Su
 
 import { GeminiAIModelAdapter } from '../infrastructure/ai/GeminiAIModelAdapter';
 import { GptMathAIModelAdapter } from '../infrastructure/ai/GptMathAIModelAdapter';
-import { GeminiAudioTranscriptionAdapter } from '../infrastructure/ai/GeminiAudioTranscriptionAdapter';
 import { WhisperTranscriptionAdapter } from '../infrastructure/ai/WhisperTranscriptionAdapter';
 import { AIModelRouter } from '../infrastructure/ai/AIModelRouter';
 import { MockAIModelAdapter } from '../infrastructure/ai/mock/MockAIModelAdapter';
@@ -57,16 +56,14 @@ const geminiTheoryModel = env.useMockAI
 
 const gptMathModel = env.useMockAI
   ? new MockAIModelAdapter('Mock AI simulando OpenAI GPT-4.1 mini / modo Light')
-  : new GptMathAIModelAdapter(geminiTheoryModel);
+  : new GptMathAIModelAdapter();
 
 const modelRouter = new AIModelRouter(geminiTheoryModel, gptMathModel);
 
 
-const geminiTranscriptionFallback = new GeminiAudioTranscriptionAdapter(geminiTheoryModel);
-
 const transcriber = env.useMockAI
   ? new MockTranscriptionAdapter()
-  : new WhisperTranscriptionAdapter(geminiTranscriptionFallback);
+  : new WhisperTranscriptionAdapter();
 
 export const loginUseCase = new LoginUseCase(authRepository);
 export const registerUseCase = new RegisterUseCase(authRepository);

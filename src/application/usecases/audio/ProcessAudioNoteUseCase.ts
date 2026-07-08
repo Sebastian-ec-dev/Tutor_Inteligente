@@ -1,4 +1,5 @@
 import { ClassContentType } from '../../../domain/entities/ClassContentType';
+import { AIProvider } from '../../../domain/entities/AIProvider';
 import { AuthRepositoryPort } from '../../../domain/ports/AuthRepositoryPort';
 import { AudioNoteRepositoryPort } from '../../../domain/ports/AudioNoteRepositoryPort';
 import { AIModelRouterPort } from '../../../domain/ports/AIModelRouterPort';
@@ -24,6 +25,7 @@ export class ProcessAudioNoteUseCase {
     audioUri: string;
     mimeType: string;
     contentType: ClassContentType;
+    aiProvider?: AIProvider;
     audioNoteId?: string;
     onProgress?: (progress: ProcessAudioProgress) => void;
   }) {
@@ -44,9 +46,9 @@ export class ProcessAudioNoteUseCase {
     input.onProgress?.('Preparando contenido académico...');
     const cleanTranscript = this.privacyFilter.clean(rawTranscript);
 
-    const selectedCapability = this.modelRouter.getCapability(input.contentType);
+    const selectedCapability = this.modelRouter.getCapability(input.contentType, input.aiProvider);
     input.onProgress?.(`Seleccionando ${selectedCapability.provider} ${selectedCapability.modelName}: ${selectedCapability.bestFor}`);
-    const selectedModel = this.modelRouter.selectModel(input.contentType);
+    const selectedModel = this.modelRouter.selectModel(input.contentType, input.aiProvider);
 
     const existingNote = input.audioNoteId
       ? await this.audioNoteRepository.getById(input.audioNoteId)

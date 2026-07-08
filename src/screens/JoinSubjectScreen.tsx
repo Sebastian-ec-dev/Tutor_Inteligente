@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Camera, Link2, QrCode } from 'lucide-react-native';
 import { PropsList } from '../navigation/AppNavigator';
 import { joinSubjectByTokenUseCase } from '../application/container';
+import AppBottomBar from '../components/ui/AppBottomBar';
 
 const BLUE = '#2563EB';
 const PURPLE = '#7C3AED';
@@ -86,8 +87,9 @@ export default function JoinSubjectScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.heroCard}>
+    <View style={styles.screen}>
+      <View style={styles.container}>
+        <View style={styles.heroCard}>
         <View style={styles.heroIcon}>
           <QrCode color="#fff" size={28} />
         </View>
@@ -125,11 +127,14 @@ export default function JoinSubjectScreen() {
           <Text style={styles.joinButtonText}>{processing ? 'Uniendo...' : 'Unirme al aula'}</Text>
         </TouchableOpacity>
       </View>
+      </View>
+      <AppBottomBar activeTab="Materias" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: BG },
   container: { flex: 1, backgroundColor: BG, padding: 16 },
   heroCard: { backgroundColor: '#EEF2FF', borderRadius: 22, borderWidth: 1, borderColor: '#C7D2FE', padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   heroIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
