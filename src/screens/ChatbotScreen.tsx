@@ -22,8 +22,8 @@ import {
   FileText,
 } from "lucide-react-native";
 import MessageBubble from "../utils/MessageBubble";
-import { COLORS } from "../components/ui/Colors";
 import TypingIndicator from "../utils/burbujaEscribiendo";
+import { useThemeMode } from "../shared/theme/ThemeContext";
 import { Subject } from "../domain/entities/Subject";
 import { AudioNote } from "../domain/entities/AudioNote";
 import { ConversationMessage } from "../domain/entities/ConversationMessage";
@@ -44,6 +44,7 @@ type ChatMessage = {
 
 export default function ChatbotScreen() {
   const route = useRoute<RouteProp<PropsList, "Chatbot">>();
+  const { colors, isDark } = useThemeMode();
   const initialSubjectId = route.params?.subjectId || "";
   const initialClassId = route.params?.classId || "";
   const flatListRef = useRef<FlatList>(null);
@@ -280,91 +281,112 @@ export default function ChatbotScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.pickerContainer}>
-        <Text style={styles.pickerLabel}>Materia:</Text>
-        <View style={styles.pickerWrapper}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Selectores de Contexto de Clase */}
+      <View style={[styles.pickerContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.pickerLabel, { color: colors.text }]}>Materia:</Text>
+        <View style={[styles.pickerWrapper, { backgroundColor: colors.background }]}>
           <Picker
             selectedValue={materiaId}
             onValueChange={(itemValue) => setMateriaId(itemValue)}
-            style={styles.picker}
-            dropdownIconColor={COLORS.primary}
+            style={[styles.picker, { color: colors.text }]}
+            dropdownIconColor={colors.primary}
           >
             {materia.length === 0 && (
               <Picker.Item
                 label="No hay materias disponibles"
                 value=""
-                color="#999"
+                color={colors.muted}
+                style={{ backgroundColor: colors.background }}
               />
             )}
             {materia.map((sub) => (
-              <Picker.Item key={sub.id} label={sub.name} value={sub.id} />
+              <Picker.Item 
+                key={sub.id} 
+                label={sub.name} 
+                value={sub.id} 
+                color={colors.text}
+                style={{ backgroundColor: colors.background }}
+              />
             ))}
           </Picker>
         </View>
       </View>
 
-      <View style={styles.pickerContainerSecondary}>
-        <Text style={styles.pickerLabel}>Clase:</Text>
-        <View style={styles.pickerWrapper}>
+      <View style={[styles.pickerContainerSecondary, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.pickerLabel, { color: colors.text }]}>Clase:</Text>
+        <View style={[styles.pickerWrapper, { backgroundColor: colors.background }]}>
           <Picker
             selectedValue={classId}
             onValueChange={(itemValue) => setClassId(itemValue)}
-            style={styles.picker}
-            dropdownIconColor={COLORS.primary}
+            style={[styles.picker, { color: colors.text }]}
+            dropdownIconColor={colors.primary}
           >
             {clases.length === 0 && (
               <Picker.Item
                 label="No hay clases procesadas"
                 value=""
-                color="#999"
+                color={colors.muted}
+                style={{ backgroundColor: colors.background }}
               />
             )}
             {clases.map((item) => (
-              <Picker.Item key={item.id} label={item.title} value={item.id} />
+              <Picker.Item 
+                key={item.id} 
+                label={item.title} 
+                value={item.id} 
+                color={colors.text}
+                style={{ backgroundColor: colors.background }}
+              />
             ))}
           </Picker>
         </View>
       </View>
 
-      <View style={styles.pickerContainerSecondary}>
-        <Text style={styles.pickerLabel}>Ruta IA:</Text>
-        <View style={styles.pickerWrapper}>
+      <View style={[styles.pickerContainerSecondary, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.pickerLabel, { color: colors.text }]}>Ruta IA:</Text>
+        <View style={[styles.pickerWrapper, { backgroundColor: colors.background }]}>
           <Picker
             selectedValue={contentType}
             onValueChange={(value) => setContentType(value)}
-            style={styles.picker}
-            dropdownIconColor={COLORS.primary}
+            style={[styles.picker, { color: colors.text }]}
+            dropdownIconColor={colors.primary}
           >
-            <Picker.Item
-              label="General · mejor para respuestas rápidas"
-              value="general"
-            />
-            <Picker.Item
-              label="Teoría · mejor para conceptos y resúmenes"
-              value="theory"
-            />
-            <Picker.Item
-              label="Matemática · mejor para razonamiento paso a paso"
-              value="math"
-            />
-            <Picker.Item
-              label="Imágenes · mejor para lectura visual"
-              value="image"
-            />
+            <Picker.Item label="General · mejor para respuestas rápidas" value="general" color={colors.text} style={{ backgroundColor: colors.background }} />
+            <Picker.Item label="Teoría · mejor para conceptos y resúmenes" value="theory" color={colors.text} style={{ backgroundColor: colors.background }} />
+            <Picker.Item label="Matemática · mejor para razonamiento paso a paso" value="math" color={colors.text} style={{ backgroundColor: colors.background }} />
+            <Picker.Item label="Imágenes · mejor para lectura visual" value="image" color={colors.text} style={{ backgroundColor: colors.background }} />
           </Picker>
         </View>
       </View>
 
-      <View style={styles.inputWrapper}>
+      {/* Historial del Feed de Conversación */}
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => item.id}
+        onContentSizeChange={() =>
+          flatListRef.current?.scrollToEnd({ animated: true })
+        }
+        contentContainerStyle={styles.list}
+        renderItem={({ item, index }) => {
+          const next = messages[index + 1];
+          const isLastInGroup = !next || next.sender !== item.sender;
+          return <MessageBubble item={item} isLastInGroup={isLastInGroup} />;
+        }}
+        ListFooterComponent={loading ? <TypingIndicator /> : null}
+      />
+
+      {/* Caja de Entrada de Texto y Adjuntos (Fija abajo) */}
+      <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, borderBottomWidth: 0 }]}>
         {pendingAttachment && (
-          <View style={styles.attachmentChip}>
+          <View style={[styles.attachmentChip, { backgroundColor: isDark ? `${colors.primary}18` : "#EEF2FF", borderColor: isDark ? `${colors.primary}44` : "#C7D2FE" }]}>
             {pendingAttachment.mimeType.startsWith("image/") ? (
-              <ImageIcon color={COLORS.primary} size={18} />
+              <ImageIcon color={colors.primary} size={18} />
             ) : (
-              <FileText color={COLORS.primary} size={18} />
+              <FileText color={colors.primary} size={18} />
             )}
-            <Text style={styles.attachmentName} numberOfLines={1}>
+            <Text style={[styles.attachmentName, { color: colors.primary }]} numberOfLines={1}>
               {pendingAttachment.name}
             </Text>
             <TouchableOpacity
@@ -378,21 +400,22 @@ export default function ChatbotScreen() {
         <View
           style={[
             styles.inputContainer,
-            inputFocused && styles.inputContainerFocused,
+            { backgroundColor: colors.background },
+            inputFocused && { borderColor: colors.primary, backgroundColor: colors.surface },
           ]}
         >
           <TouchableOpacity
-            style={styles.attachButton}
+            style={[styles.attachButton, { backgroundColor: isDark ? `${colors.primary}15` : "#EFF6FF" }]}
             onPress={adjuntarArchivo}
             disabled={!materiaId || !classId || loading}
           >
             <Paperclip
-              color={materiaId && classId ? COLORS.primary : "#94A3B8"}
+              color={materiaId && classId ? colors.primary : (isDark ? "#475569" : "#94A3B8")}
               size={21}
             />
           </TouchableOpacity>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: colors.text }]}
             placeholder={
               !materiaId
                 ? "Selecciona una materia primero..."
@@ -408,12 +431,13 @@ export default function ChatbotScreen() {
             onBlur={() => setInputFocused(false)}
             multiline
             maxLength={600}
-            placeholderTextColor={COLORS.placeholder}
+            placeholderTextColor={colors.muted}
             editable={!!materiaId && !!classId}
           />
           <TouchableOpacity
             style={[
               styles.sendButton,
+              { backgroundColor: colors.primary, shadowColor: colors.primary },
               (loading ||
                 (!inputText.trim() && !pendingAttachment) ||
                 !materiaId ||
@@ -437,25 +461,9 @@ export default function ChatbotScreen() {
           </TouchableOpacity>
         </View>
         {inputText.length > 500 && (
-          <Text style={styles.charCount}>{inputText.length}/600</Text>
+          <Text style={[styles.charCount, { color: colors.muted }]}>{inputText.length}/600</Text>
         )}
       </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        onContentSizeChange={() =>
-          flatListRef.current?.scrollToEnd({ animated: true })
-        }
-        contentContainerStyle={styles.list}
-        renderItem={({ item, index }) => {
-          const next = messages[index + 1];
-          const isLastInGroup = !next || next.sender !== item.sender;
-          return <MessageBubble item={item} isLastInGroup={isLastInGroup} />;
-        }}
-        ListFooterComponent={loading ? <TypingIndicator /> : null}
-      />
     </View>
   );
 }
@@ -463,36 +471,28 @@ export default function ChatbotScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
-
   pickerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface,
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   pickerContainerSecondary: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface,
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   pickerLabel: {
     fontSize: 15,
     fontWeight: "bold",
-    color: COLORS.text,
     marginRight: 10,
   },
   pickerWrapper: {
     flex: 1,
-    backgroundColor: COLORS.inputBg,
     borderRadius: 10,
     height: 40,
     justifyContent: "center",
@@ -501,37 +501,29 @@ const styles = StyleSheet.create({
   picker: {
     width: "100%",
     height: 100,
-    color: COLORS.text,
   },
-
   inputWrapper: {
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
     paddingVertical: 12,
     paddingHorizontal: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 3,
   },
   attachmentChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EEF2FF",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "#C7D2FE",
   },
   attachmentName: {
     flex: 1,
     marginLeft: 8,
     fontSize: 13,
-    color: COLORS.primary,
     fontWeight: "600",
   },
   removeAttachmentButton: {
@@ -541,15 +533,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 10,
-    backgroundColor: COLORS.inputBg,
     borderRadius: 26,
     borderWidth: 1.5,
     borderColor: "transparent",
     paddingLeft: 4,
-  },
-  inputContainerFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.surface,
   },
   input: {
     flex: 1,
@@ -561,7 +548,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     maxHeight: 130,
     minHeight: 52,
-    color: COLORS.text,
   },
   attachButton: {
     width: 42,
@@ -569,19 +555,15 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EFF6FF",
     marginRight: 6,
   },
-
   sendButton: {
-    backgroundColor: COLORS.primary,
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
     margin: 2,
-    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
@@ -592,12 +574,10 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 11,
-    color: COLORS.placeholder,
     textAlign: "right",
     marginTop: 4,
     marginRight: 4,
   },
-
   list: {
     padding: 15,
     paddingTop: 20,

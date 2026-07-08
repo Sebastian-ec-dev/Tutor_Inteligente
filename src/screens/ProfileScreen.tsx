@@ -13,6 +13,7 @@ import { User, Save, Users, Mail, GraduationCap, BookOpen, QrCode } from 'lucide
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LoadingModal from '../components/ui/LoadingModal';
+import { useThemeMode } from '../shared/theme/ThemeContext';
 import { PropsList } from '../navigation/AppNavigator';
 import { UserProfile } from '../domain/entities/Profile';
 import { SubjectMembership, CLASSROOM_ROLE_LABELS } from '../domain/entities/ClassroomMember';
@@ -22,16 +23,12 @@ import {
   updateProfileUseCase,
 } from '../application/container';
 
-const BLUE = '#2563EB';
-const PURPLE = '#7C3AED';
-const BG = '#F8FAFC';
-const TEXT = '#0F172A';
-const MUTED = '#64748B';
-const BORDER = '#E2E8F0';
 const GREEN = '#22C55E';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
+  const { colors, isDark } = useThemeMode();
+  
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [university, setUniversity] = useState('');
@@ -65,7 +62,7 @@ export default function ProfileScreen() {
       setLoading(true);
       const updated = await updateProfileUseCase.execute({ displayName, university });
       setProfile(updated);
-      Alert.alert('Perfil actualizado', 'Tus datos se guardaron en public.profiles.');
+      Alert.alert('Perfil actualizado', 'Tus datos se guardaron correctamente.');
     } catch (error: any) {
       Alert.alert('Error', error.message || String(error));
     } finally {
@@ -74,73 +71,82 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.heroCard}>
-        <View style={styles.avatar}>
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Cabecera / Hero Card */}
+      <View style={[
+        styles.heroCard, 
+        { 
+          backgroundColor: isDark ? `${colors.primary}15` : '#EEF2FF', 
+          borderColor: isDark ? `${colors.primary}35` : '#C7D2FE' 
+        }
+      ]}>
+        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
           <User color="#fff" size={30} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroTitle}>{displayName || 'Mi perfil'}</Text>
-          <Text style={styles.heroSubtitle}>{profile?.email || 'Correo no disponible'}</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>{displayName || 'Mi perfil'}</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.muted }]}>{profile?.email || 'Correo no disponible'}</Text>
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Datos personales</Text>
+      {/* Sección: Datos Personales */}
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Datos personales</Text>
 
         <View style={styles.fieldHeader}>
-          <User color={MUTED} size={16} />
-          <Text style={styles.label}>Nombre visible</Text>
+          <User color={colors.muted} size={16} />
+          <Text style={[styles.label, { color: colors.muted }]}>Nombre visible</Text>
         </View>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
           value={displayName}
           onChangeText={setDisplayName}
           placeholder="Ej. Mateo Andrade"
-          placeholderTextColor={MUTED}
+          placeholderTextColor={colors.muted}
         />
 
         <View style={styles.fieldHeader}>
-          <GraduationCap color={MUTED} size={16} />
-          <Text style={styles.label}>Universidad / Instituto</Text>
+          <GraduationCap color={colors.muted} size={16} />
+          <Text style={[styles.label, { color: colors.muted }]}>Universidad / Instituto</Text>
         </View>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
           value={university}
           onChangeText={setUniversity}
           placeholder="Ej. Universidad Central del Ecuador"
-          placeholderTextColor={MUTED}
+          placeholderTextColor={colors.muted}
         />
 
-        <View style={styles.infoRow}>
-          <Mail color={BLUE} size={16} />
-          <Text style={styles.infoText}>{profile?.email || 'correo no encontrado'}</Text>
+        <View style={[styles.infoRow, { backgroundColor: isDark ? `${colors.primary}15` : '#EFF6FF' }]}>
+          <Mail color={colors.primary} size={16} />
+          <Text style={[styles.infoText, { color: colors.primary }]}>{profile?.email || 'correo no encontrado'}</Text>
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={guardarPerfil} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={guardarPerfil} activeOpacity={0.85}>
           <Save color="#fff" size={18} />
           <Text style={styles.saveText}>Guardar cambios</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.card}>
+      {/* Sección: Aulas e Integración */}
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.titleRow}>
-          <Users color={PURPLE} size={19} />
-          <Text style={styles.sectionTitleNoMargin}>Aulas, amigos y roles</Text>
+          <Users color={colors.primary} size={19} />
+          <Text style={[styles.sectionTitleNoMargin, { color: colors.text }]}>Aulas, amigos y roles</Text>
         </View>
-        <Text style={styles.helperText}>
+        <Text style={[styles.helperText, { color: colors.muted }]}>
           Aquí ves las materias compartidas donde participas. Los amigos/integrantes se agregan desde la opción “Integrantes” dentro de cada materia.
         </Text>
 
-        <TouchableOpacity style={styles.joinButton} onPress={() => navigation.navigate('JoinSubject')} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.joinButton, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('JoinSubject')} activeOpacity={0.85}>
           <QrCode color="#fff" size={18} />
           <Text style={styles.joinText}>Unirme con QR o enlace</Text>
         </TouchableOpacity>
 
         {memberships.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <BookOpen color={MUTED} size={30} />
-            <Text style={styles.emptyText}>Todavía no perteneces a aulas compartidas.</Text>
+          <View style={[styles.emptyBox, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <BookOpen color={colors.muted} size={30} />
+            <Text style={[styles.emptyText, { color: colors.muted }]}>Todavía no perteneces a aulas compartidas.</Text>
           </View>
         ) : (
           <FlatList
@@ -148,10 +154,10 @@ export default function ProfileScreen() {
             keyExtractor={(item) => `${item.subjectId}-${item.role}`}
             scrollEnabled={false}
             renderItem={({ item }) => (
-              <View style={styles.membershipCard}>
-                <View style={[styles.subjectDot, { backgroundColor: item.color || BLUE }]} />
+              <View style={[styles.membershipCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                <View style={[styles.subjectDot, { backgroundColor: item.color || colors.primary }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.membershipTitle}>{item.subjectName}</Text>
+                  <Text style={[styles.membershipTitle, { color: colors.text }]}>{item.subjectName}</Text>
                   <Text style={styles.membershipRole}>{CLASSROOM_ROLE_LABELS[item.role]}</Text>
                 </View>
               </View>
@@ -166,39 +172,29 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: BG, padding: 16, paddingBottom: 30 },
-  heroCard: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 14,
-  },
-  avatar: { width: 58, height: 58, borderRadius: 19, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center' },
-  heroTitle: { color: TEXT, fontSize: 19, fontWeight: '900' },
-  heroSubtitle: { color: MUTED, fontSize: 12, fontWeight: '700', marginTop: 2 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 14 },
-  sectionTitle: { color: TEXT, fontSize: 16, fontWeight: '900', marginBottom: 14 },
-  sectionTitleNoMargin: { color: TEXT, fontSize: 16, fontWeight: '900' },
+  container: { flexGrow: 1, padding: 16, paddingBottom: 30 },
+  heroCard: { borderRadius: 22, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  avatar: { width: 58, height: 58, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  heroTitle: { fontSize: 19, fontWeight: '900' },
+  heroSubtitle: { fontSize: 12, fontWeight: '700', marginTop: 2 },
+  card: { borderRadius: 20, padding: 16, borderWidth: 1, marginBottom: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: '900', marginBottom: 14 },
+  sectionTitleNoMargin: { fontSize: 16, fontWeight: '900' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   fieldHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 7, marginTop: 6 },
-  label: { color: MUTED, fontSize: 12, fontWeight: '900' },
-  input: { height: 50, borderRadius: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, paddingHorizontal: 14, fontSize: 14, color: TEXT, marginBottom: 10 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#EFF6FF', borderRadius: 14, marginTop: 4, marginBottom: 14 },
-  infoText: { color: BLUE, fontWeight: '800', fontSize: 12 },
-  saveButton: { height: 50, borderRadius: 15, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  label: { fontSize: 12, fontWeight: '900' },
+  input: { height: 50, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, fontSize: 14, marginBottom: 10 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 14, marginTop: 4, marginBottom: 14 },
+  infoText: { fontWeight: '800', fontSize: 12 },
+  saveButton: { height: 50, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   saveText: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  helperText: { color: MUTED, fontSize: 12, lineHeight: 18, marginBottom: 12 },
-  joinButton: { height: 48, borderRadius: 14, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 12 },
+  helperText: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  joinButton: { height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 12 },
   joinText: { color: '#fff', fontWeight: '900', fontSize: 13 },
-  emptyBox: { borderRadius: 16, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, padding: 18, alignItems: 'center' },
-  emptyText: { color: MUTED, fontWeight: '700', textAlign: 'center', marginTop: 8 },
-  membershipCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: BORDER, borderRadius: 15, marginBottom: 8, backgroundColor: BG },
+  emptyBox: { borderRadius: 16, borderWidth: 1, padding: 18, alignItems: 'center' },
+  emptyText: { fontWeight: '700', textAlign: 'center', marginTop: 8 },
+  membershipCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderRadius: 15, marginBottom: 8 },
   subjectDot: { width: 12, height: 36, borderRadius: 10 },
-  membershipTitle: { color: TEXT, fontWeight: '900', fontSize: 14 },
+  membershipTitle: { fontWeight: '900', fontSize: 14 },
   membershipRole: { color: GREEN, fontWeight: '900', fontSize: 11, marginTop: 2 },
 });

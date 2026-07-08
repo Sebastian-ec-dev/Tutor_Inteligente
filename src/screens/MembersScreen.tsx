@@ -7,18 +7,14 @@ import {
   Share,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 // @ts-ignore - instalar con: npm install react-native-qrcode-svg
 import QRCode from "react-native-qrcode-svg";
 import {
-  Link,
-  MailPlus,
   QrCode,
   Share2,
   Trash2,
@@ -27,49 +23,33 @@ import {
   X,
 } from "lucide-react-native";
 import LoadingModal from "../components/ui/LoadingModal";
+import { useThemeMode } from "../shared/theme/ThemeContext";
 import { PropsList } from "../navigation/AppNavigator";
 import {
   createJoinInviteUseCase,
   deleteClassroomInviteUseCase,
-  inviteClassroomMemberUseCase,
   listClassroomMembersUseCase,
   removeClassroomMemberUseCase,
-  updateClassroomMemberRoleUseCase,
 } from "../application/container";
 import {
   CLASSROOM_ROLE_LABELS,
   ClassroomInvite,
   ClassroomMember,
-  ClassroomRole,
 } from "../domain/entities/ClassroomMember";
 import { buildSubjectInviteLink } from "../shared/inviteLinks";
 
-const BLUE = "#2563EB";
-const PURPLE = "#7C3AED";
-const BG = "#F8FAFC";
-const TEXT = "#0F172A";
-const MUTED = "#64748B";
-const BORDER = "#E2E8F0";
-const GREEN = "#22C55E";
-const ORANGE = "#F59E0B";
 const RED = "#EF4444";
-
-const ROLE_OPTIONS: Exclude<ClassroomRole, "owner">[] = [
-  "admin",
-  "teacher",
-  "student",
-];
+const ORANGE = "#F59E0B";
 
 export default function MembersScreen() {
-  const route = useRoute<RouteProp<PropsList, "Members">>();
+  const route = useRoute<RouteProp<PropsList, "Members" | "MembersScreen">>();
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
+  const { colors, isDark } = useThemeMode();
   const { subjectId, subjectName } = route.params;
 
   const [members, setMembers] = useState<ClassroomMember[]>([]);
   const [invites, setInvites] = useState<ClassroomInvite[]>([]);
   const [qrVisible, setQrVisible] = useState(false);
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Exclude<ClassroomRole, "owner">>("student");
   const [joinInvite, setJoinInvite] = useState<ClassroomInvite | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -145,62 +125,6 @@ export default function MembersScreen() {
     }
   }
 
-  async function cambiarRol(
-    member: ClassroomMember,
-    nextRole: Exclude<ClassroomRole, "owner">,
-  ) {
-    if (member.role === "owner") return;
-    try {
-      setLoading(true);
-      await updateClassroomMemberRoleUseCase.execute({
-        subjectId,
-        memberUserId: member.userId,
-        role: nextRole,
-      });
-      await cargarIntegrantes();
-    } catch (error: any) {
-      Alert.alert("Error", error.message || String(error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function eliminarIntegrante(member: ClassroomMember) {
-    if (member.role === "owner") {
-      Alert.alert(
-        "Acción no permitida",
-        "No se puede eliminar al creador del aula.",
-      );
-      return;
-    }
-
-    Alert.alert(
-      "Eliminar integrante",
-      `¿Eliminar a ${member.displayName || member.email || "este usuario"} del aula?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await removeClassroomMemberUseCase.execute({
-                subjectId,
-                memberUserId: member.userId,
-              });
-              await cargarIntegrantes();
-            } catch (error: any) {
-              Alert.alert("Error", error.message || String(error));
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ],
-    );
-  }
-
   async function eliminarInvitacion(invite: ClassroomInvite) {
     Alert.alert(
       "Eliminar invitación",
@@ -228,101 +152,81 @@ export default function MembersScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroIcon}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Tarjeta Identificadora Superior */}
+      <View style={[
+        styles.heroCard, 
+        { 
+          backgroundColor: isDark ? `${colors.primary}15` : '#EEF2FF', 
+          borderColor: isDark ? `${colors.primary}35` : '#C7D2FE' 
+        }
+      ]}>
+        <View style={[styles.heroIcon, { backgroundColor: colors.primary }]}>
           <Users color="#fff" size={24} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroTitle}>Integrantes del aula</Text>
-          <Text style={styles.heroSubtitle}>{subjectName}</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>Integrantes del aula</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.muted }]}>{subjectName}</Text>
         </View>
       </View>
 
+      {/* Fila de acciones para la gestión */}
       <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={styles.outlineButton}
+          style={[styles.outlineButton, { backgroundColor: colors.surface, borderColor: isDark ? colors.border : '#DDD6FE' }]}
           onPress={generarQrOEnlace}
           activeOpacity={0.85}
         >
-          <QrCode color={PURPLE} size={18} />
-          <Text style={styles.outlineText}>QR</Text>
+          <QrCode color={colors.primary} size={18} />
+          <Text style={[styles.outlineText, { color: colors.primary }]}>QR</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.outlineButton}
+          style={[styles.outlineButton, { backgroundColor: colors.surface, borderColor: isDark ? colors.border : '#DDD6FE' }]}
           onPress={compartirEnlace}
           activeOpacity={0.85}
         >
-          <Share2 color={PURPLE} size={18} />
-          <Text style={styles.outlineText}>Enlace</Text>
+          <Share2 color={colors.primary} size={18} />
+          <Text style={[styles.outlineText, { color: colors.primary }]}>Enlace</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.sectionTitle}>Miembros del aula</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Miembros del aula</Text>
       <FlatList
         data={members}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 20 }}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>
             No hay integrantes registrados todavía.
           </Text>
         }
         renderItem={({ item }) => (
-          <View style={styles.memberCard}>
-            <View style={styles.memberAvatar}>
-              <UserRoundCog color={BLUE} size={20} />
+          <View style={[styles.memberCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.memberAvatar, { backgroundColor: isDark ? `${colors.primary}15` : '#EFF6FF' }]}>
+              <UserRoundCog color={colors.primary} size={20} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.memberName}>
+              <Text style={[styles.memberName, { color: colors.text }]}>
                 {item.displayName || item.email || "Usuario registrado"}
               </Text>
-              <Text style={styles.memberEmail}>
+              <Text style={[styles.memberEmail, { color: colors.muted }]}>
                 {item.email || item.userId}
               </Text>
-              {/* <Text style={styles.roleBadge}>
-                {CLASSROOM_ROLE_LABELS[item.role]}
-              </Text> */}
             </View>
-            {item.role !== "owner" && (
-              <View style={styles.memberActions}>
-                {/* <View style={styles.rolePickerWrapper}>
-                  <Picker
-                    selectedValue={item.role}
-                    onValueChange={(value) => cambiarRol(item, value)}
-                    style={styles.rolePicker}
-                  >
-                    {ROLE_OPTIONS.map((r) => (
-                      <Picker.Item
-                        key={r}
-                        label={CLASSROOM_ROLE_LABELS[r]}
-                        value={r}
-                      />
-                    ))}
-                  </Picker>
-                </View> */}
-                {/* <TouchableOpacity
-                  style={styles.deleteMemberButton}
-                  onPress={() => eliminarIntegrante(item)}
-                >
-                  <Trash2 color={RED} size={17} />
-                </TouchableOpacity> */}
-              </View>
-            )}
           </View>
         )}
       />
 
-      <Text style={styles.sectionTitle}>Invitaciones pendientes</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Invitaciones pendientes</Text>
       <ScrollView style={{ maxHeight: 190 }}>
         {invites.length === 0 ? (
-          <Text style={styles.emptyText}>No hay invitaciones pendientes.</Text>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>No hay invitaciones pendientes.</Text>
         ) : (
           invites.map((invite) => (
-            <View key={invite.id} style={styles.inviteCard}>
+            <View key={invite.id} style={[styles.inviteCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.inviteEmail}>{invite.invitedEmail}</Text>
-                <Text style={styles.inviteRole}>
+                <Text style={[styles.inviteEmail, { color: colors.text }]}>{invite.invitedEmail}</Text>
+                <Text style={[styles.inviteRole, { color: ORANGE }]}>
                   {CLASSROOM_ROLE_LABELS[invite.role]} · {invite.status} ·{" "}
                   {invite.inviteType || "email"}
                   {invite.maxUses
@@ -341,6 +245,7 @@ export default function MembersScreen() {
         )}
       </ScrollView>
 
+      {/* Modal del Código QR Dinámico */}
       <Modal
         visible={qrVisible}
         transparent
@@ -348,33 +253,33 @@ export default function MembersScreen() {
         onRequestClose={() => setQrVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.qrCard}>
+          <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>QR para unirse</Text>
-                <Text style={styles.modalSubtitle}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>QR para unirse</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.muted }]}>
                   Los estudiantes se unirán como Estudiante.
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[styles.closeButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => setQrVisible(false)}
               >
-                <X size={20} color={TEXT} />
+                <X size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             {joinLink ? (
-              <View style={styles.qrBox}>
-                <QRCode value={joinLink} size={220} />
+              <View style={[styles.qrBox, { borderColor: colors.border }]}>
+                <QRCode value={joinLink} size={220} backgroundColor="#fff" color="#000" />
               </View>
             ) : null}
-            <Text style={styles.linkText}>
+            <Text style={[styles.linkText, { color: colors.muted }]}>
               {joinLink || "Generando enlace..."}
             </Text>
 
             <TouchableOpacity
-              style={styles.createButton}
+              style={[styles.createButton, { backgroundColor: colors.primary }]}
               onPress={compartirEnlace}
               activeOpacity={0.85}
             >
@@ -391,224 +296,32 @@ export default function MembersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG, padding: 16 },
-  heroCard: {
-    backgroundColor: "#EEF2FF",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#C7D2FE",
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  heroIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: PURPLE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroTitle: { color: TEXT, fontWeight: "900", fontSize: 18 },
-  heroSubtitle: { color: MUTED, fontSize: 12, fontWeight: "700", marginTop: 2 },
+  container: { flex: 1, padding: 16 },
+  heroCard: { borderRadius: 20, borderWidth: 1, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  heroIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  heroTitle: { fontWeight: "900", fontSize: 18 },
+  heroSubtitle: { fontSize: 12, fontWeight: "700", marginTop: 2 },
   actionsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  inviteButton: {
-    flex: 1.4,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: BLUE,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  inviteText: { color: "#fff", fontWeight: "900", fontSize: 13 },
-  outlineButton: {
-    flex: 0.8,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 5,
-  },
-  outlineText: { color: PURPLE, fontWeight: "900", fontSize: 12 },
-  sectionTitle: {
-    color: TEXT,
-    fontWeight: "900",
-    fontSize: 16,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  emptyText: {
-    color: MUTED,
-    fontWeight: "700",
-    textAlign: "center",
-    padding: 14,
-  },
-  memberCard: {
-    backgroundColor: "#fff",
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 8,
-  },
-  memberAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  memberName: { color: TEXT, fontWeight: "900", fontSize: 13 },
-  memberEmail: { color: MUTED, fontWeight: "700", fontSize: 11, marginTop: 2 },
-  roleBadge: { color: GREEN, fontWeight: "900", fontSize: 11, marginTop: 4 },
-  memberActions: { alignItems: "flex-end", gap: 6 },
-  rolePickerWrapper: {
-    width: 118,
-    height: 42,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: BG,
-    justifyContent: "center",
-  },
-  rolePicker: { width: 128, height: 42 },
-  deleteMemberButton: {
-    width: 38,
-    height: 34,
-    borderRadius: 11,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  inviteCard: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  inviteEmail: { color: TEXT, fontWeight: "900" },
-  inviteRole: { color: ORANGE, fontWeight: "800", fontSize: 11, marginTop: 3 },
-  deleteInviteButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    backgroundColor: "#FEF2F2",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.42)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-  },
-  qrCard: {
-    backgroundColor: BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    alignItems: "stretch",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 14,
-  },
-  modalTitle: { color: TEXT, fontWeight: "900", fontSize: 21 },
-  modalSubtitle: {
-    color: MUTED,
-    fontWeight: "700",
-    fontSize: 12,
-    marginTop: 3,
-  },
-  closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  label: {
-    color: MUTED,
-    fontSize: 12,
-    fontWeight: "900",
-    marginBottom: 7,
-    marginTop: 6,
-  },
-  input: {
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "#fff",
-    paddingHorizontal: 14,
-    color: TEXT,
-    marginBottom: 12,
-  },
-  pickerWrapper: {
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: "#fff",
-    overflow: "hidden",
-    marginBottom: 16,
-  },
-  picker: { height: 52, width: "100%" },
-  createButton: {
-    height: 50,
-    borderRadius: 15,
-    backgroundColor: BLUE,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
+  outlineButton: { flex: 1, height: 50, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
+  outlineText: { fontWeight: "900", fontSize: 14 },
+  sectionTitle: { fontWeight: "900", fontSize: 16, marginBottom: 8, marginTop: 4 },
+  emptyText: { fontWeight: "700", textAlign: "center", padding: 14 },
+  memberCard: { borderRadius: 17, borderWidth: 1, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  memberAvatar: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  memberName: { fontWeight: "900", fontSize: 13 },
+  memberEmail: { fontWeight: "700", fontSize: 11, marginTop: 2 },
+  inviteCard: { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  inviteEmail: { fontWeight: "900" },
+  inviteRole: { fontWeight: "800", fontSize: 11, marginTop: 3 },
+  deleteInviteButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: "center" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15, 23, 42, 0.55)", justifyContent: "flex-end" },
+  qrCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, alignItems: "stretch" },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
+  modalTitle: { fontWeight: "900", fontSize: 21 },
+  modalSubtitle: { fontWeight: "700", fontSize: 12, marginTop: 3 },
+  closeButton: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  createButton: { height: 50, borderRadius: 15, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   createButtonText: { color: "#fff", fontWeight: "900", fontSize: 15 },
-  qrBox: {
-    alignSelf: "center",
-    backgroundColor: "#fff",
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BORDER,
-    marginBottom: 12,
-  },
-  linkText: {
-    color: MUTED,
-    fontWeight: "700",
-    textAlign: "center",
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 14,
-  },
+  qrBox: { alignSelf: "center", backgroundColor: "#fff", padding: 14, borderRadius: 18, borderWidth: 1, marginBottom: 12 },
+  linkText: { fontWeight: "700", textAlign: "center", fontSize: 12, lineHeight: 18, marginBottom: 14 },
 });

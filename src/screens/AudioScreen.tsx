@@ -26,6 +26,7 @@ import {
   Play,
 } from "lucide-react-native";
 import LoadingModal from "../components/ui/LoadingModal";
+import { useThemeMode } from "../shared/theme/ThemeContext";
 import {
   ClassContentType,
   CLASS_CONTENT_LABELS,
@@ -56,6 +57,7 @@ const CONTENT_TYPE_OPTIONS: ClassContentType[] = [
 export default function AudioRecorderScreen() {
   const route = useRoute<RouteProp<PropsList, "Audio">>();
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
+  const { colors, isDark } = useThemeMode();
   const { subjectId, audioNoteId, audioNoteTitle } = route.params;
   const isAppendingToClass = !!audioNoteId;
 
@@ -235,18 +237,24 @@ export default function AudioRecorderScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.heroCard}>
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[
+        styles.heroCard, 
+        { 
+          backgroundColor: isDark ? `${PURPLE}15` : "#EEF2FF", 
+          borderColor: isDark ? `${PURPLE}44` : "#C7D2FE" 
+        }
+      ]}>
         <View style={styles.heroIcon}>
           <Brain color="#fff" size={26} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroTitle}>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>
             {isAppendingToClass
               ? "Agregar audio a la clase"
               : "Procesamiento inteligente"}
           </Text>
-          <Text style={styles.heroSubtitle}>
+          <Text style={[styles.heroSubtitle, { color: colors.muted }]}>
             {isAppendingToClass
               ? "El nuevo audio se unirá a la clase seleccionada. La transcripción, el resumen y el chat se actualizarán solo para este tema."
               : "La pantalla no llama directo a Gemini, GPT ni Whisper. El core procesa el audio y prepara un resumen estructurado para el chat contextual."}
@@ -254,29 +262,31 @@ export default function AudioRecorderScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>1. Datos de la clase</Text>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>1. Datos de la clase</Text>
 
-        <Text style={styles.label}>Nombre de la clase/tema</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>Nombre de la clase/tema</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
           placeholder="Ej. Test 1 - Normalización"
+          placeholderTextColor={colors.muted}
           value={titulo}
           onChangeText={setTitulo}
           editable={!loading}
         />
-        <Text style={styles.helperText}>
+        <Text style={[styles.helperText, { color: colors.muted }]}>
           {isAppendingToClass
             ? "Este audio se agregará dentro de la clase seleccionada, sin crear otra tarjeta."
             : "Puedes escribir el nombre manualmente. Si lo dejas vacío, la app generará un título automático con base en el resumen o la transcripción."}
         </Text>
 
-        <Text style={styles.label}>Tipo de contenido académico</Text>
-        <View style={styles.pickerWrapper}>
+        <Text style={[styles.label, { color: colors.muted }]}>Tipo de contenido académico</Text>
+        <View style={[styles.pickerWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <Picker
             selectedValue={contentType}
             onValueChange={(value) => setContentType(value)}
-            style={styles.picker}
+            style={[styles.picker, { color: colors.text }]}
+            dropdownIconColor={colors.text}
           >
             {CONTENT_TYPE_OPTIONS.map((option) => {
               const model = getModelCapabilityByContentType(option);
@@ -285,35 +295,49 @@ export default function AudioRecorderScreen() {
                   key={option}
                   label={`${CLASS_CONTENT_LABELS[option]} · ${model.provider} ${model.modelName}`}
                   value={option}
+                  color={colors.text}
+                  style={{ backgroundColor: colors.background }}
                 />
               );
             })}
           </Picker>
         </View>
 
-        <View style={styles.selectedModelCard}>
+        <View style={[
+          styles.selectedModelCard, 
+          { 
+            backgroundColor: isDark ? `${PURPLE}12` : "#F5F3FF", 
+            borderColor: isDark ? `${PURPLE}33` : "#DDD6FE" 
+          }
+        ]}>
           <View style={styles.selectedModelHeader}>
             <Sparkles color={PURPLE} size={18} />
-            <Text style={styles.selectedModelTitle}>
+            <Text style={[styles.selectedModelTitle, { color: colors.text }]}>
               {selectedCapability.provider} {selectedCapability.modelName}
             </Text>
           </View>
-          <Text style={styles.selectedModelText}>
+          <Text style={[styles.selectedModelText, { color: colors.muted }]}>
             Mejor para: {selectedCapability.bestFor}
           </Text>
-          <Text style={styles.selectedModelText}>
+          <Text style={[styles.selectedModelText, { color: colors.muted }]}>
             Uso dentro de la app: {selectedCapability.usedWhen}
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>2. Audio de la clase</Text>
-        <View style={styles.transcriptionCard}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>2. Audio de la clase</Text>
+        <View style={[
+          styles.transcriptionCard, 
+          { 
+            backgroundColor: isDark ? `${BLUE}12` : "#EFF6FF", 
+            borderColor: isDark ? `${BLUE}33` : "#BFDBFE" 
+          }
+        ]}>
           <Mic color={BLUE} size={19} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.transcriptionTitle}>
+            <Text style={[styles.transcriptionTitle, { color: colors.text }]}>
               OpenAI Whisper / transcriptor de audio
             </Text>
-            <Text style={styles.transcriptionText}>
+            <Text style={[styles.transcriptionText, { color: colors.muted }]}>
               Mejor para convertir grabaciones en texto. Si no hay API
               configurada, el proyecto usa el transcriptor de respaldo o Mock AI
               para pruebas.
@@ -321,18 +345,19 @@ export default function AudioRecorderScreen() {
           </View>
         </View>
 
-        <View style={styles.recordCard}>
+        <View style={[styles.recordCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.recordHeader}>
             <Clock color={isRecording ? "#EF4444" : BLUE} size={18} />
             <Text
               style={[
                 styles.recordTime,
+                { color: colors.text },
                 isRecording && styles.recordTimeActive,
               ]}
             >
               {formatTime(seconds)}
             </Text>
-            <Text style={styles.recordStatus}>
+            <Text style={[styles.recordStatus, { color: colors.muted }]}>
               {isRecording
                 ? isPaused
                   ? "Grabación pausada"
@@ -400,34 +425,34 @@ export default function AudioRecorderScreen() {
         </TouchableOpacity>
 
         {audioUri && (
-          <View style={styles.successBox}>
+          <View style={[styles.successBox, { backgroundColor: isDark ? "#14532d" : "#DCFCE7" }]}>
             <CheckCircle color={GREEN} size={20} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.successText}>Audio listo para procesar</Text>
-              <Text style={styles.successSubText}>
+              <Text style={[styles.successText, { color: isDark ? "#4ade80" : "#166534" }]}>Audio listo para procesar</Text>
+              <Text style={[styles.successSubText, { color: isDark ? "#86efac" : "#166534" }]}>
                 El archivo se preparó correctamente.
               </Text>
             </View>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>3. Modelos disponibles</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>3. Modelos disponibles</Text>
         <View style={styles.modelList}>
           {AI_MODEL_CAPABILITIES.map((item) => (
-            <View key={item.id} style={styles.modelCard}>
-              <Text style={styles.modelName}>
+            <View key={item.id} style={[styles.modelCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={[styles.modelName, { color: colors.text }]}>
                 {item.provider} · {item.modelName}
               </Text>
               <Text style={styles.modelRoute}>{item.routeLabel}</Text>
-              <Text style={styles.modelBest}>Mejor para: {item.bestFor}</Text>
+              <Text style={[styles.modelBest, { color: colors.muted }]}>Mejor para: {item.bestFor}</Text>
             </View>
           ))}
         </View>
 
         {env.useMockAI && (
-          <View style={styles.mockBox}>
+          <View style={[styles.mockBox, { backgroundColor: isDark ? "#78350f" : "#FEF3C7", borderColor: isDark ? "#92400E" : "#FDE68A" }]}>
             <Text style={styles.mockTitle}>Modo prueba activo</Text>
-            <Text style={styles.mockText}>
+            <Text style={[styles.mockText, { color: isDark ? "#fde68a" : "#92400E" }]}>
               EXPO_PUBLIC_USE_MOCK_AI=true. La app simula resumen, transcripción
               y chat contextual directo sin consumir APIs externas.
             </Text>

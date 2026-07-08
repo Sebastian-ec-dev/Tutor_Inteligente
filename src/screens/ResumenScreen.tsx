@@ -25,6 +25,7 @@ import {
 } from "lucide-react-native";
 import Markdown from "react-native-markdown-display";
 import LoadingModal from "../components/ui/LoadingModal";
+import { useThemeMode } from "../shared/theme/ThemeContext";
 import { AudioNote } from "../domain/entities/AudioNote";
 import {
   deleteAudioNoteUseCase,
@@ -36,6 +37,8 @@ import { supabase } from "../infrastructure/supabase/supabaseClient";
 export default function ResumenScreen() {
   const route = useRoute<RouteProp<PropsList, "Resumen">>();
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
+  const { colors, isDark } = useThemeMode();
+
   const { subjectId, subjectName } = route.params;
   const [resumenes, setResumenes] = useState<AudioNote[]>([]);
   const [resumenId, setResumenId] = useState<string | null>(null);
@@ -154,6 +157,19 @@ export default function ResumenScreen() {
     setTranscriptId(transcriptId === id ? null : id);
   };
 
+  // Estilos de Markdown generados dinámicamente según el tema activo
+  const dynamicMarkdownStyles = {
+    body: { fontSize: 15.5, lineHeight: 24, color: colors.text },
+    heading1: { fontSize: 22, fontWeight: "bold", marginVertical: 8, color: colors.text },
+    heading2: { fontSize: 20, fontWeight: "bold", marginVertical: 8, color: colors.text },
+    strong: { fontWeight: "bold", color: colors.text },
+    em: { fontStyle: "italic", color: colors.text },
+    bullet_list: { marginVertical: 6 },
+    ordered_list: { marginVertical: 6 },
+    list_item: { marginVertical: 4, color: colors.text },
+    paragraph: { marginVertical: 8 },
+  };
+
   const renderResumen = ({ item }: { item: AudioNote }) => {
     const isExpanded = resumenId === item.id;
     const isTranscriptOpen = transcriptId === item.id;
@@ -161,27 +177,27 @@ export default function ResumenScreen() {
     const cleanTranscript = sanitizeDisplayText(item.transcript || "");
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.surface }]}>
         <TouchableOpacity
-          style={styles.cardHeader}
+          style={[styles.cardHeader, { backgroundColor: colors.surface }]}
           onPress={() => toggleExpandir(item.id)}
         >
           <View style={styles.cardTitleRow}>
-            <FileAudio color="#007AFF" size={24} />
-            <Text style={styles.cardTitle}>{item.title}</Text>
+            <FileAudio color={colors.primary} size={24} />
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
           </View>
           {isExpanded ? (
-            <ChevronUp color="#666" />
+            <ChevronUp color={colors.muted} />
           ) : (
-            <ChevronDown color="#666" />
+            <ChevronDown color={colors.muted} />
           )}
         </TouchableOpacity>
 
         {isExpanded && activeTab === "apuntes" && (
-          <View style={styles.cardContent}>
+          <View style={[styles.cardContent, { borderTopColor: colors.border }]}>
             <View style={styles.classActionsRow}>
               <TouchableOpacity
-                style={styles.classChatButton}
+                style={[styles.classChatButton, { backgroundColor: colors.primary }]}
                 onPress={() =>
                   navigation.navigate("Chatbot", {
                     subjectId,
@@ -199,14 +215,14 @@ export default function ResumenScreen() {
               {canManageClass(item) && (
                 <>
                   <TouchableOpacity
-                    style={styles.classIconButton}
+                    style={[styles.classIconButton, { backgroundColor: isDark ? `${colors.primary}15` : "#EFF6FF", borderColor: isDark ? `${colors.primary}35` : "#BFDBFE" }]}
                     onPress={() => abrirEditarClase(item)}
                     activeOpacity={0.85}
                   >
-                    <Pencil color="#2563EB" size={16} />
+                    <Pencil color={colors.primary} size={16} />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.classIconButton}
+                    style={[styles.classIconButton, { backgroundColor: isDark ? `${colors.primary}15` : "#EFF6FF", borderColor: isDark ? `${colors.primary}35` : "#BFDBFE" }]}
                     onPress={() =>
                       navigation.navigate("Audio", {
                         subjectId,
@@ -216,7 +232,7 @@ export default function ResumenScreen() {
                     }
                     activeOpacity={0.85}
                   >
-                    <Plus color="#2563EB" size={18} />
+                    <Plus color={colors.primary} size={18} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.classIconButton, styles.classDangerButton]}
@@ -231,41 +247,41 @@ export default function ResumenScreen() {
 
             {cleanSummary ? (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Resumen estructurado</Text>
-                <Markdown style={markdownStyles}>{cleanSummary}</Markdown>
+                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Resumen estructurado</Text>
+                <Markdown style={dynamicMarkdownStyles}>{cleanSummary}</Markdown>
               </View>
             ) : null}
 
             {cleanTranscript ? (
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={styles.transcriptToggle}
+                  style={[styles.transcriptToggle, { backgroundColor: isDark ? `${colors.primary}15` : "#EFF6FF", borderColor: isDark ? `${colors.primary}35` : "#BFDBFE" }]}
                   onPress={() => toggleTranscript(item.id)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.transcriptToggleText}>
+                  <Text style={[styles.transcriptToggleText, { color: colors.text }]}>
                     Transcripción literal del audio
                   </Text>
                   <View style={styles.transcriptToggleRight}>
-                    <Text style={styles.transcriptToggleHint}>
+                    <Text style={[styles.transcriptToggleHint, { color: colors.primary }]}>
                       {isTranscriptOpen ? "Ocultar" : "Mostrar"}
                     </Text>
                     {isTranscriptOpen ? (
-                      <ChevronUp color="#2563EB" size={18} />
+                      <ChevronUp color={colors.primary} size={18} />
                     ) : (
-                      <ChevronDown color="#2563EB" size={18} />
+                      <ChevronDown color={colors.primary} size={18} />
                     )}
                   </View>
                 </TouchableOpacity>
 
                 {isTranscriptOpen ? (
-                  <View style={styles.transcriptBox}>
-                    <Markdown style={markdownStyles}>
+                  <View style={[styles.transcriptBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <Markdown style={dynamicMarkdownStyles}>
                       {cleanTranscript}
                     </Markdown>
                   </View>
                 ) : (
-                  <Text style={styles.transcriptHelp}>
+                  <Text style={[styles.transcriptHelp, { color: colors.muted }]}>
                     La transcripción está oculta para que el resumen sea más
                     fácil de revisar.
                   </Text>
@@ -276,16 +292,16 @@ export default function ResumenScreen() {
         )}
 
         {isExpanded && activeTab === "deberes" && (
-          <View style={styles.cardContent}>
+          <View style={[styles.cardContent, { borderTopColor: colors.border }]}>
             {item.deberes ? (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Deberes y entregas</Text>
-                <Markdown style={markdownStyles}>
+                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Deberes y entregas</Text>
+                <Markdown style={dynamicMarkdownStyles}>
                   {sanitizeDisplayText(item.deberes)}
                 </Markdown>
               </View>
             ) : (
-              <Text style={{ color: "#64748B", marginTop: 10 }}>
+              <Text style={{ color: colors.muted, marginTop: 10 }}>
                 No se detectaron tareas o fechas de entrega.
               </Text>
             )}
@@ -301,39 +317,41 @@ export default function ResumenScreen() {
   });
 
   return (
-    <View style={styles.container}>
-      <View style={styles.actionsPanel}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.actionsPanel, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity
-          style={styles.secondaryAction}
+          style={[styles.secondaryAction, { backgroundColor: isDark ? `${colors.primary}15` : "#F5F3FF", borderColor: isDark ? `${colors.primary}35` : "#DDD6FE" }]}
           onPress={() =>
             navigation.navigate("Members", { subjectId, subjectName })
           }
         >
-          <Users color="#7C3AED" size={17} />
-          <Text style={styles.secondaryActionText}>Integrantes</Text>
+          <Users color={colors.primary} size={17} />
+          <Text style={[styles.secondaryActionText, { color: colors.primary }]}>Integrantes</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.secondaryAction}
+          style={[styles.secondaryAction, { backgroundColor: isDark ? `${colors.primary}15` : "#F5F3FF", borderColor: isDark ? `${colors.primary}35` : "#DDD6FE" }]}
           onPress={() =>
             navigation.navigate("Chatbot", { subjectId, subjectName })
           }
         >
-          <MessageSquare color="#7C3AED" size={17} />
-          <Text style={styles.secondaryActionText}>Chat</Text>
+          <MessageSquare color={colors.primary} size={17} />
+          <Text style={[styles.secondaryActionText, { color: colors.primary }]}>Chat</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { backgroundColor: colors.background }]}>
         <TouchableOpacity
           style={[
             styles.tabButton,
-            activeTab === "apuntes" && styles.activeTabButton,
+            { backgroundColor: colors.border },
+            activeTab === "apuntes" && { backgroundColor: colors.primary },
           ]}
           onPress={() => setActiveTab("apuntes")}
         >
           <Text
             style={[
               styles.tabText,
+              { color: colors.muted },
               activeTab === "apuntes" && styles.activeTabText,
             ]}
           >
@@ -343,13 +361,15 @@ export default function ResumenScreen() {
         <TouchableOpacity
           style={[
             styles.tabButton,
-            activeTab === "deberes" && styles.activeTabButton,
+            { backgroundColor: colors.border },
+            activeTab === "deberes" && { backgroundColor: colors.primary },
           ]}
           onPress={() => setActiveTab("deberes")}
         >
           <Text
             style={[
               styles.tabText,
+              { color: colors.muted },
               activeTab === "deberes" && styles.activeTabText,
             ]}
           >
@@ -360,7 +380,7 @@ export default function ResumenScreen() {
 
       {currentTabResumenes.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: colors.muted }]}>
             {activeTab === "apuntes"
               ? "No hay apuntes en esta materia."
               : "No se han detectado deberes en esta materia."}
@@ -376,11 +396,12 @@ export default function ResumenScreen() {
       )}
 
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: colors.primary }]}
         onPress={() => navigation.navigate("Audio", { subjectId })}
       >
         <Plus color="#fff" size={30} />
       </TouchableOpacity>
+
       <Modal
         visible={editModalVisible}
         transparent
@@ -388,24 +409,24 @@ export default function ResumenScreen() {
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Editar nombre de la clase</Text>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Editar nombre de la clase</Text>
             <TextInput
-              style={styles.modalInput}
+              style={[styles.modalInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
               value={editingTitle}
               onChangeText={setEditingTitle}
               placeholder="Ej. Test 1 - Dispositivos móviles"
-              placeholderTextColor="#64748B"
+              placeholderTextColor={colors.muted}
             />
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
-                style={styles.modalCancelButton}
+                style={[styles.modalCancelButton, { backgroundColor: colors.border }]}
                 onPress={() => setEditModalVisible(false)}
               >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+                <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalSaveButton}
+                style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}
                 onPress={guardarNombreClase}
               >
                 <Text style={styles.modalSaveText}>Guardar</Text>
@@ -431,46 +452,28 @@ function sanitizeDisplayText(text: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
+  container: { flex: 1 },
   actionsPanel: {
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
     padding: 12,
     flexDirection: "row",
     gap: 8,
     flexWrap: "wrap",
   },
-  primaryAction: {
-    flexGrow: 1,
-    height: 44,
-    borderRadius: 13,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 6,
-    paddingHorizontal: 10,
-  },
-  primaryActionText: { color: "#fff", fontWeight: "900", fontSize: 12 },
   secondaryAction: {
     height: 44,
     borderRadius: 13,
-    backgroundColor: "#F5F3FF",
     borderWidth: 1,
-    borderColor: "#DDD6FE",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
     paddingHorizontal: 10,
   },
-  secondaryActionText: { color: "#7C3AED", fontWeight: "900", fontSize: 12 },
   tabContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,
     paddingTop: 10,
-    backgroundColor: "#f5f5f5",
     gap: 10,
   },
   tabButton: {
@@ -478,14 +481,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#E2E8F0",
     borderRadius: 12,
   },
-  activeTabButton: {
-    backgroundColor: "#2563EB",
-  },
   tabText: {
-    color: "#64748B",
     fontWeight: "700",
     fontSize: 14,
   },
@@ -495,9 +493,8 @@ const styles = StyleSheet.create({
   },
   list: { padding: 15 },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#888", fontSize: 16 },
+  emptyText: { fontSize: 16 },
   card: {
-    backgroundColor: "#fff",
     borderRadius: 12,
     marginBottom: 15,
     shadowColor: "#000",
@@ -512,26 +509,21 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
   },
   cardTitleRow: { flexDirection: "row", alignItems: "center", flex: 1 },
   cardTitle: {
     fontSize: 18,
     marginLeft: 15,
     fontWeight: "500",
-    color: "#333",
     flexShrink: 1,
   },
   cardContent: {
     padding: 20,
     paddingTop: 0,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
   },
   section: { marginTop: 15 },
   transcriptToggle: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
     borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 12,
@@ -541,24 +533,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   transcriptToggleText: {
-    color: "#0F172A",
     fontWeight: "900",
     fontSize: 14,
     flex: 1,
   },
   transcriptToggleRight: { flexDirection: "row", alignItems: "center", gap: 4 },
-  transcriptToggleHint: { color: "#2563EB", fontWeight: "900", fontSize: 12 },
+  transcriptToggleHint: { fontWeight: "900", fontSize: 12 },
   transcriptBox: {
     marginTop: 10,
-    backgroundColor: "#F8FAFC",
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
   },
   transcriptHelp: {
     marginTop: 8,
-    color: "#64748B",
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "600",
@@ -566,7 +554,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#007AFF",
     marginBottom: 5,
   },
   classActionsRow: {
@@ -580,7 +567,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 42,
     borderRadius: 13,
-    backgroundColor: "#2563EB",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -591,9 +577,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 13,
-    backgroundColor: "#EFF6FF",
     borderWidth: 1,
-    borderColor: "#BFDBFE",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -604,13 +588,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
   },
   modalTitle: {
-    color: "#0F172A",
     fontWeight: "900",
     fontSize: 20,
     marginBottom: 12,
@@ -618,11 +600,8 @@ const styles = StyleSheet.create({
   modalInput: {
     height: 50,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
     borderRadius: 14,
     paddingHorizontal: 14,
-    color: "#0F172A",
-    backgroundColor: "#F8FAFC",
     marginBottom: 14,
   },
   modalActionsRow: { flexDirection: "row", gap: 10 },
@@ -630,7 +609,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -638,17 +616,15 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "#2563EB",
     alignItems: "center",
     justifyContent: "center",
   },
-  modalCancelText: { color: "#475569", fontWeight: "900" },
+  modalCancelText: { fontWeight: "900" },
   modalSaveText: { color: "#fff", fontWeight: "900" },
   fab: {
     position: "absolute",
     bottom: 20,
     right: 20,
-    backgroundColor: "#007AFF",
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -660,30 +636,4 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-});
-
-const markdownStyles = StyleSheet.create({
-  body: {
-    fontSize: 15.5,
-    lineHeight: 24,
-    color: "#444",
-  },
-  heading1: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginVertical: 8,
-    color: "#222",
-  },
-  heading2: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginVertical: 8,
-    color: "#222",
-  },
-  strong: { fontWeight: "bold", color: "#222" },
-  em: { fontStyle: "italic" },
-  bullet_list: { marginVertical: 6 },
-  ordered_list: { marginVertical: 6 },
-  list_item: { marginVertical: 4 },
-  paragraph: { marginVertical: 8 },
 });

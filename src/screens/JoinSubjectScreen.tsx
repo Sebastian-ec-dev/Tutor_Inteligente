@@ -12,18 +12,13 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Camera, Link2, QrCode } from 'lucide-react-native';
+import { useThemeMode } from '../shared/theme/ThemeContext';
 import { PropsList } from '../navigation/AppNavigator';
 import { joinSubjectByTokenUseCase } from '../application/container';
 
-const BLUE = '#2563EB';
-const PURPLE = '#7C3AED';
-const BG = '#F8FAFC';
-const TEXT = '#0F172A';
-const MUTED = '#64748B';
-const BORDER = '#E2E8F0';
-
 export default function JoinSubjectScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
+  const { colors, isDark } = useThemeMode();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanMode, setScanMode] = useState(false);
   const [tokenOrLink, setTokenOrLink] = useState('');
@@ -86,38 +81,57 @@ export default function JoinSubjectScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroIcon}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Tarjeta Informativa Superior */}
+      <View style={[
+        styles.heroCard, 
+        { 
+          backgroundColor: isDark ? `${colors.primary}15` : '#EEF2FF', 
+          borderColor: isDark ? `${colors.primary}35` : '#C7D2FE' 
+        }
+      ]}>
+        <View style={[styles.heroIcon, { backgroundColor: colors.primary }]}>
           <QrCode color="#fff" size={28} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroTitle}>Unirme a una materia</Text>
-          <Text style={styles.heroSubtitle}>Escanea un QR o pega el enlace compartido por el creador del aula.</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>Unirme a una materia</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.muted }]}>Escanea un QR o pega el enlace compartido por el creador del aula.</Text>
         </View>
       </View>
 
-      <TouchableOpacity style={styles.scanButton} onPress={openScanner} activeOpacity={0.85}>
+      {/* Botón de Escáner QR */}
+      <TouchableOpacity 
+        style={[styles.scanButton, { backgroundColor: colors.primary }]} 
+        onPress={openScanner} 
+        activeOpacity={0.85}
+      >
         <Camera color="#fff" size={20} />
         <Text style={styles.scanButtonText}>Escanear QR</Text>
       </TouchableOpacity>
 
-      <View style={styles.card}>
+      {/* Formulario de Entrada Manual */}
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.cardTitleRow}>
-          <Link2 color={PURPLE} size={18} />
-          <Text style={styles.cardTitle}>Unirme con enlace o token</Text>
+          <Link2 color={colors.primary} size={18} />
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Unirme con enlace o token</Text>
         </View>
-        <Text style={styles.helperText}>Pega un enlace tipo aulaia://join?token=... o solo el token de invitación.</Text>
+        <Text style={[styles.helperText, { color: colors.muted }]}>Pega un enlace tipo aulaia://join?token=... o solo el token de invitación.</Text>
+        
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
           placeholder="Pega aquí el enlace o token"
-          placeholderTextColor={MUTED}
+          placeholderTextColor={colors.muted}
           value={tokenOrLink}
           onChangeText={setTokenOrLink}
           autoCapitalize="none"
         />
+        
         <TouchableOpacity
-          style={[styles.joinButton, (!tokenOrLink.trim() || processing) && styles.disabledButton]}
+          style={[
+            styles.joinButton, 
+            { backgroundColor: colors.primary },
+            (!tokenOrLink.trim() || processing) && styles.disabledButton
+          ]}
           disabled={!tokenOrLink.trim() || processing}
           onPress={() => joinWithValue(tokenOrLink)}
           activeOpacity={0.85}
@@ -130,19 +144,19 @@ export default function JoinSubjectScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG, padding: 16 },
-  heroCard: { backgroundColor: '#EEF2FF', borderRadius: 22, borderWidth: 1, borderColor: '#C7D2FE', padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  heroIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
-  heroTitle: { color: TEXT, fontWeight: '900', fontSize: 18 },
-  heroSubtitle: { color: MUTED, fontWeight: '700', fontSize: 12, lineHeight: 18, marginTop: 3 },
-  scanButton: { height: 52, borderRadius: 16, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 14 },
+  container: { flex: 1, padding: 16 },
+  heroCard: { borderRadius: 22, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  heroIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  heroTitle: { fontWeight: '900', fontSize: 18 },
+  heroSubtitle: { fontWeight: '700', fontSize: 12, lineHeight: 18, marginTop: 3 },
+  scanButton: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 14 },
   scanButtonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
-  card: { backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: BORDER, padding: 16 },
+  card: { borderRadius: 20, borderWidth: 1, padding: 16 },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  cardTitle: { color: TEXT, fontWeight: '900', fontSize: 16 },
-  helperText: { color: MUTED, fontWeight: '700', fontSize: 12, lineHeight: 18, marginBottom: 12 },
-  input: { minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, paddingHorizontal: 14, color: TEXT, marginBottom: 14 },
-  joinButton: { height: 50, borderRadius: 15, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { fontWeight: '900', fontSize: 16 },
+  helperText: { fontWeight: '700', fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  input: { minHeight: 52, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, marginBottom: 14 },
+  joinButton: { height: 50, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   disabledButton: { opacity: 0.45 },
   joinButtonText: { color: '#fff', fontWeight: '900', fontSize: 15 },
   cameraContainer: { flex: 1, backgroundColor: '#000' },
@@ -150,5 +164,5 @@ const styles = StyleSheet.create({
   scanTitle: { color: '#fff', fontWeight: '900', fontSize: 18, marginTop: 10 },
   scanText: { color: '#CBD5E1', fontWeight: '700', textAlign: 'center', fontSize: 12, lineHeight: 18, marginTop: 6, marginBottom: 14 },
   cancelButton: { height: 44, borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { color: TEXT, fontWeight: '900' },
+  cancelText: { color: '#0F172A', fontWeight: '900' },
 });
