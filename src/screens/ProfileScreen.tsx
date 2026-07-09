@@ -10,7 +10,7 @@ import {
   View,
   Switch,
 } from 'react-native';
-import { User, Save, Users, Mail, GraduationCap, BookOpen, QrCode, Moon, Sun } from 'lucide-react-native';
+import { User, Save, Users, Mail, GraduationCap, BookOpen, QrCode, Moon, Sun, HelpCircle } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LoadingModal from '../components/ui/LoadingModal';
@@ -24,6 +24,7 @@ import {
   listMyMembershipsUseCase,
   updateProfileUseCase,
 } from '../application/container';
+import { localOnboardingRepository } from '../infrastructure/onboarding/LocalOnboardingRepository';
 
 const BLUE = '#2563EB';
 const PURPLE = '#7C3AED';
@@ -86,6 +87,12 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
+  }
+
+
+  async function verTutorialInicial() {
+    await localOnboardingRepository.resetTutorial();
+    navigation.navigate('Home', { showTutorial: true });
   }
 
   return (
@@ -159,6 +166,20 @@ export default function ProfileScreen() {
             trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
           />
         </View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.titleRow}>
+          <HelpCircle color={BLUE} size={19} />
+          <Text style={[styles.sectionTitleNoMargin, { color: theme.text }]}>Guía inicial</Text>
+        </View>
+        <Text style={[styles.helperText, { color: theme.muted }]}>
+          Puedes volver a ver las ventanas flotantes que explican las funciones principales de AulaIA.
+        </Text>
+        <Pressable style={styles.tutorialButton} onPress={verTutorialInicial}>
+          <HelpCircle color="#fff" size={18} />
+          <Text style={styles.tutorialButtonText}>Ver tutorial nuevamente</Text>
+        </Pressable>
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -245,4 +266,6 @@ const styles = StyleSheet.create({
   settingRow: { borderRadius: 16, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   settingTitle: { fontWeight: '900', fontSize: 14 },
   settingSubtitle: { fontWeight: '600', fontSize: 12, marginTop: 3, maxWidth: 200 },
+  tutorialButton: { height: 48, borderRadius: 14, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  tutorialButtonText: { color: '#fff', fontWeight: '900', fontSize: 13 },
 });

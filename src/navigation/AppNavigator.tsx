@@ -18,7 +18,7 @@ import JoinSubjectScreen from '../screens/JoinSubjectScreen';
 
 export type PropsList = {
   Login: undefined;
-  Home: undefined;
+  Home: { showTutorial?: boolean } | undefined;
   Materias: undefined;
   Resumen: { subjectId: string; subjectName: string };
   Audio: { subjectId: string; audioNoteId?: string; audioNoteTitle?: string };

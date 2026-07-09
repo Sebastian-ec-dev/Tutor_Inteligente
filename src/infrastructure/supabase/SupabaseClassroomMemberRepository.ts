@@ -116,6 +116,7 @@ export class SupabaseClassroomMemberRepository implements ClassroomMemberReposit
       subject_id: input.subjectId,
       invited_email: input.invitedEmail,
       role: input.role,
+      created_by: input.createdBy,
       status: 'pending',
       invite_type: 'email',
       max_uses: 1,
@@ -137,7 +138,8 @@ export class SupabaseClassroomMemberRepository implements ClassroomMemberReposit
         subject_id: input.subjectId,
         invited_email: input.invitedEmail,
         role: input.role,
-          status: 'pending',
+        created_by: input.createdBy,
+        status: 'pending',
       })
       .select(INVITE_SELECT_LEGACY)
       .single();
@@ -159,7 +161,8 @@ export class SupabaseClassroomMemberRepository implements ClassroomMemberReposit
         subject_id: input.subjectId,
         invited_email: 'enlace-compartido',
         role: input.role,
-          status: 'pending',
+        created_by: input.createdBy,
+        status: 'pending',
         invite_type: input.inviteType,
         max_uses: input.maxUses || 50,
         uses_count: 0,

@@ -6,6 +6,11 @@ const MAX_SESSIONS = 80;
 const MAX_MESSAGES_PER_SESSION = 40;
 
 class LocalChatSessionRepository {
+  async listAll(): Promise<ChatSession[]> {
+    const sessions = await this.readAll();
+    return sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
+
   async listByClass(subjectId: string, classId: string): Promise<ChatSession[]> {
     const sessions = await this.readAll();
     return sessions

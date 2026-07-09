@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -8,16 +8,18 @@ import {
   Pressable,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BookOpen, ChevronRight, MessageSquare, Mic, Plus, Search, Sparkles } from 'lucide-react-native';
 import { PropsList } from '../navigation/AppNavigator';
 import AppBottomBar from '../components/ui/AppBottomBar';
 import { useAppTheme } from '../components/ui/ThemeContext';
 import LoadingModal from '../components/ui/LoadingModal';
+import OnboardingTutorial from '../components/onboarding/OnboardingTutorial';
 import { AudioNote } from '../domain/entities/AudioNote';
 import { Subject } from '../domain/entities/Subject';
 import { getProfileUseCase, listAudioNotesUseCase, listSubjectsUseCase } from '../application/container';
+import { localOnboardingRepository } from '../infrastructure/onboarding/LocalOnboardingRepository';
 
 const BLUE = '#2563EB';
 const PURPLE = '#7C3AED';
@@ -34,6 +36,7 @@ type RecentClass = {
 
 export default function HomeDashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
+  const route = useRoute<RouteProp<PropsList, 'Home'>>();
   const appTheme = useAppTheme();
   const colors = appTheme.colors;
   const [displayName, setDisplayName] = useState('');
@@ -41,16 +44,26 @@ export default function HomeDashboardScreen() {
   const [recentClasses, setRecentClasses] = useState<RecentClass[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', cargarHome);
+  const revisarTutorialInicial = useCallback(async () => {
+    try {
+      if (route.params?.showTutorial) {
+        setShowTutorial(true);
+        navigation.setParams({ showTutorial: false });
+        return;
+      }
 
-    return () => {
-      unsubscribe();
-    };
-  }, [navigation]);
+      const tutorialVisto = await localOnboardingRepository.hasSeenTutorial();
+      if (!tutorialVisto) {
+        setShowTutorial(true);
+      }
+    } catch (error) {
+      console.log('[HomeDashboard] No se pudo revisar el tutorial inicial:', error);
+    }
+  }, [navigation, route.params?.showTutorial]);
 
-  async function cargarHome() {
+  const cargarHome = useCallback(async () => {
     try {
       setLoading(true);
       const [profile, materias] = await Promise.all([
@@ -82,6 +95,22 @@ export default function HomeDashboardScreen() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      cargarHome();
+      revisarTutorialInicial();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [navigation, cargarHome, revisarTutorialInicial]);
+
+  async function cerrarTutorialInicial() {
+    await localOnboardingRepository.markTutorialSeen();
+    setShowTutorial(false);
   }
 
   const filteredClasses = useMemo(() => {
@@ -246,6 +275,11 @@ export default function HomeDashboardScreen() {
       </ScrollView>
 
       <AppBottomBar activeTab="Home" subjectId={subjects[0]?.id} />
+      <OnboardingTutorial
+        visible={showTutorial}
+        onFinish={cerrarTutorialInicial}
+        onSkip={cerrarTutorialInicial}
+      />
       <LoadingModal visible={loading} text="Cargando inicio..." />
     </View>
   );
