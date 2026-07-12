@@ -1,120 +1,125 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import { Brain, Database, Mic, Sparkles } from 'lucide-react-native';
-import { AI_MODEL_CAPABILITIES } from '../domain/entities/AIModelCapability';
+import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Sparkles } from 'lucide-react-native';
 
 const BLUE = '#2563EB';
 const PURPLE = '#7C3AED';
 const TEXT = '#0F172A';
 const MUTED = '#64748B';
-const BORDER = '#DBEAFE';
 
 export default function SplashScreen() {
-  const scaleRef = useRef<Animated.Value | null>(null);
-  const opacityRef = useRef<Animated.Value | null>(null);
-  const progressRef = useRef<Animated.Value | null>(null);
-
-  if (!scaleRef.current) scaleRef.current = new Animated.Value(0.92);
-  if (!opacityRef.current) opacityRef.current = new Animated.Value(0.35);
-  if (!progressRef.current) progressRef.current = new Animated.Value(0);
-
-  const scale = scaleRef.current;
-  const opacity = opacityRef.current;
-  const progress = progressRef.current;
+  const logoScale = useRef(new Animated.Value(0.55)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoTranslate = useRef(new Animated.Value(78)).current;
+  const nameOpacity = useRef(new Animated.Value(0)).current;
+  const nameTranslate = useRef(new Animated.Value(-28)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const sparkleRotation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(scale, {
-            toValue: 1.04,
-            duration: 850,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacity, {
-            toValue: 1,
-            duration: 850,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(scale, {
-            toValue: 0.92,
-            duration: 850,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacity, {
-            toValue: 0.35,
-            duration: 850,
-            easing: Easing.in(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
+    const intro = Animated.sequence([
+      Animated.parallel([
+        Animated.spring(logoScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 55,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
       ]),
+      Animated.parallel([
+        Animated.timing(logoTranslate, {
+          toValue: 0,
+          duration: 650,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(nameTranslate, {
+          toValue: 0,
+          duration: 650,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(nameOpacity, {
+          toValue: 1,
+          duration: 520,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(taglineOpacity, {
+        toValue: 1,
+        duration: 420,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    const sparkle = Animated.loop(
+      Animated.timing(sparkleRotation, {
+        toValue: 1,
+        duration: 2200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
     );
 
-    const progressAnimation = Animated.timing(progress, {
-      toValue: 1,
-      duration: 3000,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    });
-
-    pulse.start();
-    progressAnimation.start();
+    intro.start();
+    sparkle.start();
 
     return () => {
-      pulse.stop();
-      progressAnimation.stop();
+      intro.stop();
+      sparkle.stop();
     };
-  }, [opacity, progress, scale]);
+  }, [logoOpacity, logoScale, logoTranslate, nameOpacity, nameTranslate, sparkleRotation, taglineOpacity]);
 
-  const width = progress.interpolate({
+  const rotate = sparkleRotation.interpolate({
     inputRange: [0, 1],
-    outputRange: ['8%', '100%'],
+    outputRange: ['0deg', '360deg'],
   });
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.logoHalo, { opacity, transform: [{ scale }] }]}>
-        <View style={styles.logoCircle}>
-          <Brain color="#fff" size={42} />
-        </View>
+      <View style={styles.decorTop} />
+      <View style={styles.decorBottom} />
+
+      <Animated.View style={[styles.sparkleTop, { transform: [{ rotate }] }]}> 
+        <Sparkles color={PURPLE} size={26} />
       </Animated.View>
 
-      <Text style={styles.title}>AulaIA</Text>
-      <Text style={styles.subtitle}>Preparando tu aula inteligente</Text>
+      <View style={styles.brandLine}>
+        <Animated.View
+          style={{
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }, { translateX: logoTranslate }],
+          }}
+        >
+          <Image source={require('../../assets/icon.png')} style={styles.logo} />
+        </Animated.View>
 
-      <View style={styles.progressTrack}>
-        <Animated.View style={[styles.progressFill, { width }]} />
+        <Animated.View
+          style={{
+            opacity: nameOpacity,
+            transform: [{ translateX: nameTranslate }],
+          }}
+        >
+          <Text style={styles.brandName}>
+            Aula<Text style={styles.brandIA}>IA</Text>
+          </Text>
+        </Animated.View>
       </View>
 
-      <View style={styles.statusCard}>
-        <View style={styles.statusRow}>
-          <Mic color={BLUE} size={18} />
-          <Text style={styles.statusText}>Activando transcriptor de audio</Text>
+      <Animated.View style={[styles.taglineBox, { opacity: taglineOpacity }]}> 
+        <Text style={styles.tagline}>Graba, organiza y aprende mejor</Text>
+        <View style={styles.loadingDots}>
+          <View style={styles.dot} />
+          <View style={[styles.dot, { backgroundColor: PURPLE }]} />
+          <View style={[styles.dot, { opacity: 0.45 }]} />
         </View>
-        <View style={styles.statusRow}>
-          <Sparkles color={PURPLE} size={18} />
-          <Text style={styles.statusText}>Cargando router de modelos IA</Text>
-        </View>
-        <View style={styles.statusRow}>
-          <Database color="#16A34A" size={18} />
-          <Text style={styles.statusText}>Conectando Supabase y contexto directo</Text>
-        </View>
-      </View>
-
-      <View style={styles.modelList}>
-        {AI_MODEL_CAPABILITIES.map((item) => (
-          <View key={item.id} style={styles.modelPill}>
-            <Text style={styles.modelName}>{item.modelName}</Text>
-            <Text style={styles.modelUse} numberOfLines={2}>{item.bestFor}</Text>
-          </View>
-        ))}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -122,96 +127,56 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F8FAFF',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  logoHalo: {
-    width: 132,
-    height: 132,
-    borderRadius: 66,
-    backgroundColor: '#DBEAFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
-  },
-  logoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: BLUE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 6px 14px rgba(37, 99, 235, 0.28)',
-  },
-  title: {
-    color: TEXT,
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: -0.6,
-  },
-  subtitle: {
-    color: MUTED,
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 6,
-    marginBottom: 26,
-  },
-  progressTrack: {
-    width: '100%',
-    height: 9,
-    borderRadius: 99,
-    backgroundColor: '#E2E8F0',
     overflow: 'hidden',
-    marginBottom: 18,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 99,
-    backgroundColor: PURPLE,
+  decorTop: {
+    position: 'absolute',
+    width: 290,
+    height: 290,
+    borderRadius: 145,
+    backgroundColor: '#DBEAFE',
+    top: -125,
+    right: -100,
+    opacity: 0.78,
   },
-  statusCard: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 14,
-    marginBottom: 12,
+  decorBottom: {
+    position: 'absolute',
+    width: 330,
+    height: 330,
+    borderRadius: 165,
+    backgroundColor: '#EDE9FE',
+    bottom: -170,
+    left: -125,
+    opacity: 0.72,
   },
-  statusRow: {
+  sparkleTop: {
+    position: 'absolute',
+    top: '29%',
+    right: '18%',
+  },
+  brandLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    gap: 16,
   },
-  statusText: {
-    color: TEXT,
-    fontSize: 13,
-    fontWeight: '700',
+  logo: {
+    width: 112,
+    height: 112,
+    borderRadius: 30,
   },
-  modelList: {
-    width: '100%',
-    gap: 8,
+  brandName: {
+    color: BLUE,
+    fontSize: 43,
+    fontWeight: '900',
+    letterSpacing: -1.7,
   },
-  modelPill: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-  },
-  modelName: {
-    color: TEXT,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  modelUse: {
-    color: MUTED,
-    fontSize: 11,
-    marginTop: 2,
-    lineHeight: 15,
-  },
+  brandIA: { color: PURPLE },
+  taglineBox: { alignItems: 'center', marginTop: 28 },
+  tagline: { color: TEXT, fontSize: 15, fontWeight: '800' },
+  loadingDots: { flexDirection: 'row', gap: 7, marginTop: 16 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BLUE },
 });

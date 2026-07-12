@@ -5,8 +5,17 @@ export type AITextPart = {
   base64Data?: string;
 };
 
+export type AIRequestOptions = {
+  temperature?: number;
+  enableWebSearch?: boolean;
+};
+
 export interface AIModelPort {
   readonly name: string;
-  generateText(prompt: string, attachment?: AITextPart): Promise<string>;
+  generateText(
+    prompt: string,
+    attachment?: AITextPart,
+    options?: AIRequestOptions,
+  ): Promise<string>;
   analyzeClass(input: { content: string; contentType: ClassContentType }): Promise<string>;
 }

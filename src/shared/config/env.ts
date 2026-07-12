@@ -1,8 +1,7 @@
-function numberFromEnv(value: string | undefined, fallback: number) {
-  if (!value) return fallback;
-
+function numberFromEnv(value: string | undefined, fallback: number, min = 0, max = 2) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 export const env = {
@@ -10,13 +9,20 @@ export const env = {
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   geminiApiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
   openAIApiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
-  openAIMathModel: process.env.EXPO_PUBLIC_OPENAI_MATH_MODEL || process.env.EXPO_PUBLIC_OPENAI_CHAT_MODEL || 'gpt-4.1-mini',
-  openAIChatModel: process.env.EXPO_PUBLIC_OPENAI_CHAT_MODEL || 'gpt-4.1-mini',
-  openAISummaryModel: process.env.EXPO_PUBLIC_OPENAI_SUMMARY_MODEL || 'gpt-4.1-mini',
-  openAIVisionModel: process.env.EXPO_PUBLIC_OPENAI_VISION_MODEL || 'gpt-4.1-mini',
-  openAITranscriptionModel: process.env.EXPO_PUBLIC_OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
-  aiChatTemperature: numberFromEnv(process.env.EXPO_PUBLIC_AI_CHAT_TEMPERATURE, 0.3),
-  aiSummaryTemperature: numberFromEnv(process.env.EXPO_PUBLIC_AI_SUMMARY_TEMPERATURE, 0.2),
+  openAIMathModel: process.env.EXPO_PUBLIC_OPENAI_MATH_MODEL || 'gpt-4.1-mini',
+  openAITranscriptionModel:
+    process.env.EXPO_PUBLIC_OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
+  aiChatTemperature: numberFromEnv(
+    process.env.EXPO_PUBLIC_AI_CHAT_TEMPERATURE,
+    0.3,
+  ),
+  aiSummaryTemperature: numberFromEnv(
+    process.env.EXPO_PUBLIC_AI_SUMMARY_TEMPERATURE,
+    0.15,
+  ),
+  enableTutorWebSearch: process.env.EXPO_PUBLIC_ENABLE_TUTOR_WEB_SEARCH !== 'false',
+  enableTranscriptionFallback:
+    process.env.EXPO_PUBLIC_ENABLE_TRANSCRIPTION_FALLBACK === 'true',
   useMockAI: process.env.EXPO_PUBLIC_USE_MOCK_AI === 'true',
 };
 

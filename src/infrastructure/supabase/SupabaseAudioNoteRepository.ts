@@ -1,9 +1,14 @@
-import { AudioNote, NewAudioNote, UpdateAudioNote } from '../../domain/entities/AudioNote';
-import { AudioNoteRepositoryPort } from '../../domain/ports/AudioNoteRepositoryPort';
-import { supabase } from './supabaseClient';
+import {
+  AudioNote,
+  NewAudioNote,
+  UpdateAudioNote,
+} from "../../domain/entities/AudioNote";
+import { AudioNoteRepositoryPort } from "../../domain/ports/AudioNoteRepositoryPort";
+import { supabase } from "./supabaseClient";
 
-const AUDIOS_TABLE = 'audios';
-const AUDIO_SELECT = 'id, user_id, subject_id, title, transcript, summary, content_type, created_at';
+const AUDIOS_TABLE = "audios";
+const AUDIO_SELECT =
+  "id, user_id, subject_id, title, transcript, summary, deberes, content_type, created_at";
 
 function mapAudioNote(row: any): AudioNote {
   return {
@@ -12,20 +17,24 @@ function mapAudioNote(row: any): AudioNote {
     subjectId: row.subject_id,
     title: row.title,
     transcript: row.transcript || row.transcription || null,
-    summary: row.summary || '',
-    contentType: row.content_type || 'general',
+    summary: row.summary || "",
+    deberes: row.deberes || null,
+    contentType: row.content_type || "general",
     createdAt: row.created_at,
   };
 }
 
 export class SupabaseAudioNoteRepository implements AudioNoteRepositoryPort {
-  async listBySubject(subjectId: string, _userId: string): Promise<AudioNote[]> {
+  async listBySubject(
+    subjectId: string,
+    _userId: string,
+  ): Promise<AudioNote[]> {
     // El acceso lo controla RLS: el usuario puede ver apuntes/clases de materias propias o compartidas.
     const { data, error } = await supabase
       .from(AUDIOS_TABLE)
       .select(AUDIO_SELECT)
-      .eq('subject_id', subjectId)
-      .order('created_at', { ascending: false });
+      .eq("subject_id", subjectId)
+      .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
     return (data || []).map(mapAudioNote);
@@ -35,7 +44,7 @@ export class SupabaseAudioNoteRepository implements AudioNoteRepositoryPort {
     const { data, error } = await supabase
       .from(AUDIOS_TABLE)
       .select(AUDIO_SELECT)
-      .eq('id', audioNoteId)
+      .eq("id", audioNoteId)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
@@ -47,13 +56,15 @@ export class SupabaseAudioNoteRepository implements AudioNoteRepositoryPort {
       .from(AUDIOS_TABLE)
       .insert([
         {
+          user_id: note.userId,
           subject_id: note.subjectId,
           title: note.title,
           transcript: note.transcript,
           transcription: note.transcript,
           summary: note.summary,
+          deberes: note.deberes,
           content_type: note.contentType,
-          status: 'processed',
+          status: "processed",
         },
       ])
       .select(AUDIO_SELECT)
@@ -72,12 +83,13 @@ export class SupabaseAudioNoteRepository implements AudioNoteRepositoryPort {
       payload.transcription = note.transcript;
     }
     if (note.summary !== undefined) payload.summary = note.summary;
+    if (note.deberes !== undefined) payload.deberes = note.deberes;
     if (note.contentType !== undefined) payload.content_type = note.contentType;
 
     const { data, error } = await supabase
       .from(AUDIOS_TABLE)
       .update(payload)
-      .eq('id', note.id)
+      .eq("id", note.id)
       .select(AUDIO_SELECT)
       .single();
 
@@ -89,7 +101,7 @@ export class SupabaseAudioNoteRepository implements AudioNoteRepositoryPort {
     const { error } = await supabase
       .from(AUDIOS_TABLE)
       .delete()
-      .eq('id', audioNoteId);
+      .eq("id", audioNoteId);
 
     if (error) throw new Error(error.message);
   }

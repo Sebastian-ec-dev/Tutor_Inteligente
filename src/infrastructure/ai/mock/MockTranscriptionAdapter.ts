@@ -1,7 +1,7 @@
-import { TranscriptionPort } from '../../../domain/ports/TranscriptionPort';
+import { TranscriptionInput, TranscriptionPort } from '../../../domain/ports/TranscriptionPort';
 
 export class MockTranscriptionAdapter implements TranscriptionPort {
-  async transcribeAudio(_input: { base64Audio: string; mimeType: string }): Promise<string> {
-    return 'Transcripción simulada de una clase. El docente explica conceptos principales, ejemplos prácticos, tareas posibles y recomendaciones de estudio. La información irrelevante para el aprendizaje se omite antes de guardar.';
+  async transcribeAudio(_input: TranscriptionInput): Promise<string> {
+    return 'Transcripción simulada de una clase académica. Este texto permite probar el flujo sin consumir una API real.';
   }
 }

@@ -1,4 +1,8 @@
-import { AIModelPort, AITextPart } from '../../domain/ports/AIModelPort';
+import {
+  AIModelPort,
+  AIRequestOptions,
+  AITextPart,
+} from '../../domain/ports/AIModelPort';
 import { ClassContentType } from '../../domain/entities/ClassContentType';
 import { buildClassAnalysisPrompt } from '../../application/promptBuilders';
 import { getGeminiClient } from './geminiClient';
@@ -7,16 +11,11 @@ import { env } from '../../shared/config/env';
 export class GeminiAIModelAdapter implements AIModelPort {
   readonly name = 'Google Gemini 2.5 Flash';
 
-  async generateText(prompt: string, attachment?: AITextPart): Promise<string> {
-    return this.requestText(prompt, attachment, env.aiChatTemperature);
-  }
-
-  async analyzeClass(input: { content: string; contentType: ClassContentType }): Promise<string> {
-    const prompt = buildClassAnalysisPrompt(input.content, input.contentType);
-    return this.requestText(prompt, undefined, env.aiSummaryTemperature);
-  }
-
-  private async requestText(prompt: string, attachment: AITextPart | undefined, temperature: number): Promise<string> {
+  async generateText(
+    prompt: string,
+    attachment?: AITextPart,
+    options?: AIRequestOptions,
+  ): Promise<string> {
     let contents: any[] = [prompt];
 
     if (attachment?.mimeType && attachment.base64Data) {
@@ -35,10 +34,20 @@ export class GeminiAIModelAdapter implements AIModelPort {
       model: 'gemini-2.5-flash',
       contents,
       config: {
-        temperature,
+        temperature: options?.temperature ?? env.aiChatTemperature,
       },
-    });
+    } as any);
 
     return response.text || '';
+  }
+
+  async analyzeClass(input: {
+    content: string;
+    contentType: ClassContentType;
+  }): Promise<string> {
+    const prompt = buildClassAnalysisPrompt(input.content, input.contentType);
+    return this.generateText(prompt, undefined, {
+      temperature: env.aiSummaryTemperature,
+    });
   }
 }

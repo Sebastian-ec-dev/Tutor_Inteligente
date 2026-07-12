@@ -1,307 +1,168 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  Pressable,
-  ScrollView,
   View,
-} from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import { RouteProp, useRoute } from "@react-navigation/native";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
-import { decode } from "base64-arraybuffer";
+} from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 import {
-  ArrowLeft,
-  BookOpen,
   Bot,
+  BookOpen,
   ChevronDown,
-  ChevronUp,
-  FolderOpen,
-  MessageSquare,
+  ChevronLeft,
+  FileText,
+  Globe2,
+  Image as ImageIcon,
+  MessageCircle,
+  MoreVertical,
   Paperclip,
-  PlusCircle,
+  Pencil,
+  Plus,
+  Search,
   Send,
-  SlidersHorizontal,
   Sparkles,
-} from "lucide-react-native";
-import MessageBubble from "../utils/MessageBubble";
-import AppBottomBar from "../components/ui/AppBottomBar";
-import { useAppTheme } from "../components/ui/ThemeContext";
-import TypingIndicator from "../utils/burbujaEscribiendo";
-import { Subject } from "../domain/entities/Subject";
-import { AudioNote } from "../domain/entities/AudioNote";
-import { ConversationMessage } from "../domain/entities/ConversationMessage";
-import { ChatSession } from "../domain/entities/ChatSession";
-import { ClassContentType } from "../domain/entities/ClassContentType";
-import { AIProvider } from "../domain/entities/AIProvider";
+  Trash2,
+  X,
+} from 'lucide-react-native';
+import MessageBubble from '../utils/MessageBubble';
+import AppBottomBar from '../components/ui/AppBottomBar';
+import TypingIndicator from '../utils/burbujaEscribiendo';
+import { Subject } from '../domain/entities/Subject';
+import { AudioNote } from '../domain/entities/AudioNote';
+import { ConversationMessage } from '../domain/entities/ConversationMessage';
+import { ClassContentType } from '../domain/entities/ClassContentType';
+import { ChatSession } from '../domain/entities/ChatSession';
+import { AIProvider, AI_PROVIDER_LABELS } from '../domain/entities/AIProvider';
 import {
   askTutorUseCase,
   listAudioNotesUseCase,
   listSubjectsUseCase,
-} from "../application/container";
-import { supabase } from "../infrastructure/supabase/supabaseClient";
-import { localChatSessionRepository } from "../infrastructure/chat/LocalChatSessionRepository";
-import { PropsList } from "../navigation/AppNavigator";
+} from '../application/container';
+import { chatSessionRepository } from '../infrastructure/supabase/SupabaseChatSessionRepository';
+import { supabase } from '../infrastructure/supabase/supabaseClient';
+import { PropsList } from '../navigation/AppNavigator';
+import { useAppTheme } from '../components/ui/ThemeContext';
 
-type ChatMessage = {
-  id: string;
-  text: string;
-  sender: "user" | "bot";
+const ALL_SUBJECTS = '__all_subjects__';
+
+type ChatMessage = ConversationMessage;
+type ChatView = 'list' | 'conversation';
+type ConfigMode = 'new' | 'edit';
+
+type PendingAttachment = {
+  mimeType: string;
+  base64Data: string;
+  name: string;
 };
 
-type ScreenMode = "history" | "setup" | "chat";
-
-function initialBotMessage(classTitle?: string): ChatMessage {
+function welcomeMessage(classTitle?: string): ChatMessage {
   return {
-    id: "1",
+    id: `welcome_${Date.now()}`,
+    sender: 'bot',
     text: classTitle
-      ? `¡Listo! Pregúntame sobre la clase "${classTitle}". Usaré esa clase como tema base y también puedo reforzar el aprendizaje con explicación general relacionada.`
-      : "¡Hola! Soy tu tutor de IA. Primero selecciona una materia y una clase. La configuración básica está activa para ahorrar consumo.",
-    sender: "bot",
+      ? `¡Hola! Este chat está dedicado a “${classTitle}”. Mantendré la conversación enfocada en esta clase y usaré sus apuntes como contexto.`
+      : 'Selecciona una materia y una clase para crear una tutoría personalizada.',
   };
 }
 
-function toChatMessages(messages: ConversationMessage[]): ChatMessage[] {
-  if (!messages.length) return [];
-
-  return messages.map((message, index) => ({
-    id: message.id || `${Date.now()}_${index}`,
-    text: message.text,
-    sender: message.sender,
-  }));
+function buildChatTitle(question: string): string {
+  const clean = question.replace(/\s+/g, ' ').trim();
+  if (!clean) return 'Nueva conversación';
+  return clean.length > 48 ? `${clean.slice(0, 48)}…` : clean;
 }
 
-function toConversationMessages(
-  messages: ChatMessage[],
-): ConversationMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    text: message.text,
-    sender: message.sender,
-  }));
-}
-
-function buildSessionTitle(firstQuestion: string, classTitle?: string): string {
-  const cleanQuestion = firstQuestion.trim().replace(/\s+/g, " ");
-  if (cleanQuestion) return cleanQuestion.slice(0, 48);
-  return `Charla sobre ${classTitle || "la clase"}`;
-}
-
-function formatSessionDate(value: string): string {
-  try {
-    return new Date(value).toLocaleDateString();
-  } catch {
-    return "Reciente";
+function formatUpdatedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
+  return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+}
+
+function getPastelBorder(color: string | null | undefined, fallback: string): string {
+  if (!color) return fallback;
+  const clean = color.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(clean)) return `${clean}66`;
+  return fallback;
+}
+
+function getSessionPreview(session: ChatSession): string {
+  const lastMessage = [...session.messages]
+    .reverse()
+    .find((message) => message.text && !message.text.startsWith('¡Hola!'));
+  const clean = lastMessage?.text?.replace(/\s+/g, ' ').trim() || 'Conversación preparada';
+  return clean.length > 62 ? `${clean.slice(0, 62)}…` : clean;
 }
 
 export default function ChatbotScreen() {
-  const route = useRoute<RouteProp<PropsList, "Chatbot">>();
-  const initialSubjectId = route.params?.subjectId || "";
-  const initialClassId = route.params?.classId || "";
-  const flatListRef = useRef<FlatList>(null);
-  const classIdRef = useRef<string>(initialClassId);
-  const chatSessionIdRef = useRef<string>("");
-  const preferredSessionIdRef = useRef<string>("");
-  const appTheme = useAppTheme();
-  const colors = appTheme.colors;
+  const route = useRoute<RouteProp<PropsList, 'Chatbot'>>();
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    initialBotMessage(route.params?.className),
-  ]);
-  const [inputText, setInputText] = useState("");
+  const [view, setView] = useState<ChatView>('list');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [inputFocused, setInputFocused] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [screenMode, setScreenMode] = useState<ScreenMode>(
-    initialClassId ? "chat" : "history",
-  );
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [currentClasses, setCurrentClasses] = useState<AudioNote[]>([]);
+  const [subjectFilter, setSubjectFilter] = useState(ALL_SUBJECTS);
+  const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
+  const [chatSearch, setChatSearch] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
 
-  const [materias, setMaterias] = useState<Subject[]>([]);
-  const [materiaId, setMateriaId] = useState<string>(initialSubjectId);
-  const [clases, setClases] = useState<AudioNote[]>([]);
-  const [classId, setClassId] = useState<string>(initialClassId);
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const [allChatSessions, setAllChatSessions] = useState<ChatSession[]>([]);
-  const [chatSessionId, setChatSessionId] = useState<string>("");
+  const [configVisible, setConfigVisible] = useState(false);
+  const [configMode, setConfigMode] = useState<ConfigMode>('new');
+  const [configSubjectId, setConfigSubjectId] = useState('');
+  const [configClassId, setConfigClassId] = useState('');
+  const [configClasses, setConfigClasses] = useState<AudioNote[]>([]);
+  const [configProvider, setConfigProvider] = useState<AIProvider>('gemini');
+  const [configWebSearch, setConfigWebSearch] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
 
-  // Configuración básica por defecto para una nueva charla.
-  // No consume IA hasta que el usuario envía una pregunta.
-  const [contentType, setContentType] = useState<ClassContentType>("general");
-  const [aiProvider, setAiProvider] = useState<AIProvider>("gemini");
+  const [actionSession, setActionSession] = useState<ChatSession | null>(null);
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameText, setRenameText] = useState('');
 
-  const cargarMaterias = useCallback(async () => {
-    try {
-      const data = await listSubjectsUseCase.execute();
-      setMaterias(data);
-      if (!initialSubjectId && data.length > 0) {
-        setMateriaId(data[0].id);
-      }
-    } catch (error) {
-      console.log("Error cargando materias:", error);
-    }
-  }, [initialSubjectId]);
+  const currentSession = sessions.find((item) => item.id === currentSessionId) || null;
+  const selectedSubject = subjects.find((item) => item.id === currentSession?.subjectId);
+  const selectedClass = currentClasses.find((item) => item.id === currentSession?.classId);
 
-  const cargarClases = useCallback(
-    async (subjectId: string) => {
-      try {
-        const data = await listAudioNotesUseCase.execute(subjectId);
-        setClases(data);
-
-        const currentClassId = classIdRef.current;
-        const currentExists =
-          currentClassId && data.some((item) => item.id === currentClassId);
-        if (currentExists) {
-          setClassId(currentClassId);
-          return;
-        }
-
-        const initialExists =
-          initialClassId && data.some((item) => item.id === initialClassId);
-        if (initialExists) {
-          classIdRef.current = initialClassId;
-          setClassId(initialClassId);
-          return;
-        }
-
-        const firstClassId = data[0]?.id || "";
-        classIdRef.current = firstClassId;
-        setClassId(firstClassId);
-      } catch (error) {
-        console.log("Error cargando clases:", error);
-        setClases([]);
-        classIdRef.current = "";
-        setClassId("");
-      }
-    },
-    [initialClassId],
-  );
-
-  const cargarHistorialGlobal = useCallback(async () => {
-    const sessions = await localChatSessionRepository.listAll();
-    setAllChatSessions(sessions);
+  useEffect(() => {
+    initialize().catch((error) => {
+      console.log('[ChatbotScreen] Inicialización:', error);
+      Alert.alert('Tutor IA', error.message || String(error));
+    });
   }, []);
 
-  const cargarCharlas = useCallback(
-    async (subjectId: string, selectedClassId: string, classTitle?: string) => {
-      if (!subjectId || !selectedClassId) {
-        setChatSessions([]);
-        setChatSessionId("");
-        setMessages([initialBotMessage()]);
-        return;
-      }
-
-      const sessions = await localChatSessionRepository.listByClass(
-        subjectId,
-        selectedClassId,
-      );
-      setChatSessions(sessions);
-
-      const preferredSessionId =
-        preferredSessionIdRef.current || chatSessionIdRef.current;
-      const sessionToOpen = preferredSessionId
-        ? sessions.find((item) => item.id === preferredSessionId)
-        : undefined;
-      if (sessionToOpen) {
-        preferredSessionIdRef.current = "";
-        chatSessionIdRef.current = sessionToOpen.id;
-        setChatSessionId(sessionToOpen.id);
-        setMessages(toChatMessages(sessionToOpen.messages));
-        setContentType(sessionToOpen.contentType || "general");
-        setAiProvider(sessionToOpen.aiProvider || "gemini");
-        return;
-      }
-
-      preferredSessionIdRef.current = "";
-      chatSessionIdRef.current = "";
-      setChatSessionId("");
-      setMessages([initialBotMessage(classTitle)]);
-    },
-    [],
-  );
-
-  const guardarCharla = useCallback(
-    async (nextMessages: ChatMessage[], firstQuestion: string) => {
-      if (!materiaId || !classId) return;
-
-      const selectedClass = clases.find((item) => item.id === classId);
-      const existingSession =
-        chatSessions.find((session) => session.id === chatSessionId) ||
-        allChatSessions.find((session) => session.id === chatSessionId);
-      const now = new Date().toISOString();
-      const id = chatSessionId || `chat_${Date.now()}`;
-
-      const session: ChatSession = {
-        id,
-        subjectId: materiaId,
-        classId,
-        classTitle: selectedClass?.title || existingSession?.classTitle,
-        title:
-          existingSession?.title ||
-          buildSessionTitle(firstQuestion, selectedClass?.title),
-        messages: toConversationMessages(nextMessages),
-        contentType,
-        aiProvider,
-        createdAt: existingSession?.createdAt || now,
-        updatedAt: now,
-      };
-
-      await localChatSessionRepository.upsert(session);
-      chatSessionIdRef.current = id;
-      setChatSessionId(id);
-      setChatSessions((prev) => [
-        session,
-        ...prev.filter((item) => item.id !== id),
-      ]);
-      setAllChatSessions((prev) => [
-        session,
-        ...prev.filter((item) => item.id !== id),
-      ]);
-    },
-    [
-      aiProvider,
-      allChatSessions,
-      chatSessionId,
-      chatSessions,
-      classId,
-      clases,
-      contentType,
-      materiaId,
-    ],
+  useFocusEffect(
+    useCallback(() => {
+      refreshSessions().catch(() => undefined);
+    }, []),
   );
 
   useEffect(() => {
-    classIdRef.current = classId;
-  }, [classId]);
-
-  useEffect(() => {
-    chatSessionIdRef.current = chatSessionId;
-  }, [chatSessionId]);
-
-  useEffect(() => {
-    cargarMaterias();
-    cargarHistorialGlobal();
-  }, [cargarMaterias, cargarHistorialGlobal]);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      () => setKeyboardVisible(true),
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => setKeyboardVisible(false),
-    );
-
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -309,1177 +170,908 @@ export default function ChatbotScreen() {
   }, []);
 
   useEffect(() => {
-    flatListRef.current?.scrollToEnd({ animated: true });
-  }, [messages, loading]);
+    if (view !== 'conversation') return;
+    const timeout = setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+    return () => clearTimeout(timeout);
+  }, [messages, loading, view]);
 
-  useEffect(() => {
-    if (!materiaId) {
-      setClases([]);
-      setClassId("");
-      return;
-    }
+  async function initialize() {
+    const [subjectData, sessionData] = await Promise.all([
+      listSubjectsUseCase.execute(),
+      chatSessionRepository.listAll(),
+    ]);
+    setSubjects(subjectData);
+    setSessions(sessionData);
 
-    cargarClases(materiaId);
-  }, [materiaId, cargarClases]);
-
-  useEffect(() => {
-    const selectedClass = clases.find((item) => item.id === classId);
-    cargarCharlas(materiaId, classId, selectedClass?.title);
-  }, [materiaId, classId, clases, cargarCharlas]);
-
-  function nuevaCharlaBasica() {
-    chatSessionIdRef.current = "";
-    setChatSessionId("");
-    setAiProvider("gemini");
-    setContentType("general");
-    setSettingsOpen(false);
-    const selectedClass = clases.find((item) => item.id === classId);
-    setMessages([initialBotMessage(selectedClass?.title)]);
-    setScreenMode("chat");
-  }
-
-  function continuarCharla(sessionId: string) {
-    if (sessionId === "__new__") {
-      nuevaCharlaBasica();
-      return;
-    }
-
-    const session = chatSessions.find((item) => item.id === sessionId);
-    if (!session) return;
-
-    chatSessionIdRef.current = session.id;
-    setChatSessionId(session.id);
-    setMessages(toChatMessages(session.messages));
-    setContentType(session.contentType || "general");
-    setAiProvider(session.aiProvider || "gemini");
-    setSettingsOpen(false);
-    setScreenMode("chat");
-  }
-
-  function abrirListaChats() {
-    setScreenMode("history");
-    setSettingsOpen(false);
-  }
-
-  function abrirConfiguracionNueva() {
-    preferredSessionIdRef.current = "";
-    chatSessionIdRef.current = "";
-    setChatSessionId("");
-    setAiProvider("gemini");
-    setContentType("general");
-    setMessages([]);
-    setSettingsOpen(false);
-    setScreenMode("setup");
-  }
-
-  function iniciarNuevaCharlaConfigurada() {
-    if (!materiaId || !classId) {
-      Alert.alert(
-        "Selecciona una clase",
-        "Primero escoge la materia, la clase o tema y el modo del Tutor IA.",
+    const requestedSubjectId = route.params?.subjectId;
+    const requestedClassId = route.params?.classId;
+    if (requestedSubjectId && requestedClassId) {
+      const existing = sessionData.find(
+        (session) =>
+          session.subjectId === requestedSubjectId && session.classId === requestedClassId,
       );
+      if (existing) {
+        await openSession(existing, subjectData);
+      } else {
+        await openNewChatConfig(requestedSubjectId, requestedClassId, subjectData);
+      }
       return;
     }
 
-    const selectedClass = clases.find((item) => item.id === classId);
-    preferredSessionIdRef.current = "";
-    chatSessionIdRef.current = "";
-    setChatSessionId("");
-    setMessages([initialBotMessage(selectedClass?.title)]);
-    setSettingsOpen(false);
-    setScreenMode("chat");
+    setView('list');
   }
 
-  function abrirCharlaGuardada(session: ChatSession) {
-    preferredSessionIdRef.current = session.id;
-    classIdRef.current = session.classId;
-    chatSessionIdRef.current = session.id;
-    setMateriaId(session.subjectId);
-    setClassId(session.classId);
-    setChatSessionId(session.id);
-    setMessages(toChatMessages(session.messages));
-    setContentType(session.contentType || "general");
-    setAiProvider(session.aiProvider || "gemini");
-    setSettingsOpen(false);
-    setScreenMode("chat");
+  async function refreshSessions() {
+    const next = await chatSessionRepository.listAll();
+    setSessions(next);
+    return next;
   }
 
-  async function adjuntarArchivo() {
-    if (!materiaId || !classId) {
-      Alert.alert(
-        "Selecciona una clase",
-        "Primero selecciona la materia y la clase o tema para asociar el archivo al chat.",
-      );
+  async function openSession(session: ChatSession, sourceSubjects = subjects) {
+    const classData = await listAudioNotesUseCase.execute(session.subjectId);
+    setCurrentClasses(classData);
+    setCurrentSessionId(session.id);
+    setMessages(session.messages.length ? session.messages : [welcomeMessage(session.classTitle)]);
+    setPendingAttachment(null);
+    setInputText('');
+    setView('conversation');
+
+    if (!sourceSubjects.some((item) => item.id === session.subjectId)) {
+      const latestSubjects = await listSubjectsUseCase.execute();
+      setSubjects(latestSubjects);
+    }
+  }
+
+  async function openNewChatConfig(
+    preferredSubjectId?: string,
+    preferredClassId?: string,
+    sourceSubjects = subjects,
+  ) {
+    if (!sourceSubjects.length) {
+      Alert.alert('No hay materias', 'Cree una materia y procese una clase antes de iniciar el Tutor IA.');
       return;
     }
 
+    const subjectId =
+      preferredSubjectId && sourceSubjects.some((item) => item.id === preferredSubjectId)
+        ? preferredSubjectId
+        : sourceSubjects[0].id;
+    const classData = await listAudioNotesUseCase.execute(subjectId);
+    setConfigMode('new');
+    setEditingSessionId(null);
+    setConfigSubjectId(subjectId);
+    setConfigClasses(classData);
+    setConfigClassId(
+      preferredClassId && classData.some((item) => item.id === preferredClassId)
+        ? preferredClassId
+        : classData[0]?.id || '',
+    );
+    setConfigProvider('gemini');
+    setConfigWebSearch(false);
+    setConfigVisible(true);
+  }
+
+  async function changeConfigSubject(nextSubjectId: string) {
+    setConfigSubjectId(nextSubjectId);
+    setConfigClassId('');
+    if (!nextSubjectId) {
+      setConfigClasses([]);
+      return;
+    }
+    try {
+      const classData = await listAudioNotesUseCase.execute(nextSubjectId);
+      setConfigClasses(classData);
+      setConfigClassId(classData[0]?.id || '');
+    } catch (error: any) {
+      setConfigClasses([]);
+      Alert.alert('No se pudieron cargar las clases', error.message || String(error));
+    }
+  }
+
+  function changeProvider(provider: AIProvider) {
+    setConfigProvider(provider);
+    if (provider !== 'openai') setConfigWebSearch(false);
+  }
+
+  async function createOrUpdateChat() {
+    if (!configSubjectId || !configClassId) {
+      Alert.alert('Seleccione una clase', 'Elija una materia y una clase o audio procesado.');
+      return;
+    }
+
+    const classItem = configClasses.find((item) => item.id === configClassId);
+    if (!classItem) {
+      Alert.alert('Clase no disponible', 'La clase seleccionada ya no está disponible.');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    if (configMode === 'edit' && editingSessionId) {
+      const previous = sessions.find((session) => session.id === editingSessionId);
+      if (!previous) return;
+      const updated: ChatSession = {
+        ...previous,
+        subjectId: configSubjectId,
+        classId: configClassId,
+        classTitle: classItem.title,
+        contentType: classItem.contentType || 'general',
+        aiProvider: configProvider,
+        webSearchEnabled: configProvider === 'openai' && configWebSearch,
+        updatedAt: now,
+      };
+      await chatSessionRepository.upsert(updated);
+      setConfigVisible(false);
+      setActionSession(null);
+      await refreshSessions();
+      if (currentSessionId === updated.id) await openSession(updated);
+      return;
+    }
+
+    const newSession: ChatSession = {
+      id: `chat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      subjectId: configSubjectId,
+      classId: configClassId,
+      classTitle: classItem.title,
+      title: classItem.title || 'Nueva conversación',
+      messages: [welcomeMessage(classItem.title)],
+      contentType: classItem.contentType || 'general',
+      aiProvider: configProvider,
+      webSearchEnabled: configProvider === 'openai' && configWebSearch,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await chatSessionRepository.upsert(newSession);
+    setConfigVisible(false);
+    await refreshSessions();
+    await openSession(newSession);
+  }
+
+  async function saveConversation(nextMessages: ChatMessage[], firstQuestion: string) {
+    if (!currentSession) return;
+    const shouldReplaceTitle =
+      currentSession.title === currentSession.classTitle ||
+      currentSession.title === 'Nueva conversación';
+    const updated: ChatSession = {
+      ...currentSession,
+      title: shouldReplaceTitle ? buildChatTitle(firstQuestion) : currentSession.title,
+      messages: nextMessages,
+      updatedAt: new Date().toISOString(),
+    };
+    await chatSessionRepository.upsert(updated);
+    setCurrentSessionId(updated.id);
+    await refreshSessions();
+  }
+
+  async function attachFile() {
+    if (!currentSession) return;
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          "image/*",
-          "audio/*",
-          "application/pdf",
-          "text/*",
-          "application/*",
-        ],
+        type: ['image/*', 'audio/*', 'application/pdf', 'text/*', 'application/*'],
         copyToCacheDirectory: true,
       });
-
       if (result.canceled) return;
 
       const asset = result.assets[0];
-      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: "base64",
-      });
-      const safeName = (asset.name || "archivo").replace(
-        /[^a-zA-Z0-9_.-]/g,
-        "_",
-      );
-      const storagePath = `${materiaId}/${classId}/${Date.now()}_${safeName}`;
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error('No estás autenticado');
 
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+      const safeName = (asset.name || 'archivo').replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const mimeType = asset.mimeType || 'application/octet-stream';
+      setPendingAttachment({ mimeType, base64Data: base64, name: asset.name || safeName });
+
+      const storagePath = `${currentSession.subjectId}/${currentSession.classId}/${Date.now()}_${safeName}`;
       const { error: uploadError } = await supabase.storage
-        .from("chat-uploads")
-        .upload(storagePath, decode(base64), {
-          contentType: asset.mimeType || "application/octet-stream",
-          upsert: false,
-        });
-
+        .from('chat-uploads')
+        .upload(storagePath, decode(base64), { contentType: mimeType, upsert: false });
       if (uploadError) throw new Error(uploadError.message);
 
-      await supabase.from("session_files").insert({
-        subject_id: materiaId,
-        audio_id: classId,
+      const { error: fileError } = await supabase.from('session_files').insert({
+        subject_id: currentSession.subjectId,
+        audio_id: currentSession.classId,
+        uploaded_by: userId,
         file_name: asset.name || safeName,
-        file_type: (asset.mimeType || "").startsWith("image/")
-          ? "image"
-          : (asset.mimeType || "").startsWith("audio/")
-            ? "audio"
-            : (asset.mimeType || "").includes("pdf")
-              ? "pdf"
-              : "document",
+        file_type: mimeType.startsWith('image/')
+          ? 'image'
+          : mimeType.startsWith('audio/')
+            ? 'audio'
+            : mimeType.includes('pdf')
+              ? 'pdf'
+              : 'document',
         storage_path: storagePath,
-        mime_type: asset.mimeType || null,
+        mime_type: mimeType,
         size_bytes: asset.size || null,
       });
-
-      const attachmentMessages: ChatMessage[] = [
-        ...messages,
-        {
-          id: Date.now().toString(),
-          text: "Adjunté un archivo de apoyo para esta clase.",
-          sender: "user",
-        },
-        {
-          id: (Date.now() + 1).toString(),
-          text: "Archivo adjuntado correctamente. Quedó asociado a la clase seleccionada.",
-          sender: "bot",
-        },
-      ];
-      setMessages(attachmentMessages);
-      await guardarCharla(attachmentMessages, "Archivo de apoyo adjuntado");
+      if (fileError) throw new Error(fileError.message);
     } catch (error: any) {
-      Alert.alert("Error al adjuntar", error.message || String(error));
+      setPendingAttachment(null);
+      Alert.alert('Error al adjuntar', error.message || String(error));
     }
   }
 
-  async function enviarMensaje() {
-    if (!inputText.trim() || loading) return;
-    if (!materiaId || !classId) {
-      Alert.alert(
-        "Selecciona una clase",
-        "Escoge primero la materia y la clase o tema para que el chat use ese contexto base.",
-      );
-      return;
-    }
+  async function sendMessage() {
+    if ((!inputText.trim() && !pendingAttachment) || loading || !currentSession) return;
 
+    const messageText =
+      inputText.trim() || `[Archivo adjunto: ${pendingAttachment?.name || 'archivo'}]`;
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      text: inputText.trim(),
-      sender: "user",
+      text: messageText,
+      sender: 'user',
     };
-
-    const history: ConversationMessage[] = toConversationMessages(messages);
     const messagesWithUser = [...messages, userMessage];
+    const attachmentToSend = pendingAttachment;
 
     setMessages(messagesWithUser);
-    setInputText("");
+    setInputText('');
+    setPendingAttachment(null);
     setLoading(true);
 
     try {
-      const botResponseText = await askTutorUseCase.execute({
-        question: userMessage.text,
-        subjectId: materiaId,
-        classId,
-        history,
-        contentType,
-        aiProvider,
+      const botText = await askTutorUseCase.execute({
+        question: messageText,
+        subjectId: currentSession.subjectId,
+        subjectName: selectedSubject?.name,
+        classId: currentSession.classId,
+        history: messages,
+        contentType: currentSession.contentType,
+        aiProvider: currentSession.aiProvider,
+        webSearchEnabled: currentSession.webSearchEnabled,
+        attachment: attachmentToSend
+          ? {
+              mimeType: attachmentToSend.mimeType,
+              base64Data: attachmentToSend.base64Data,
+            }
+          : undefined,
       });
 
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        text: botResponseText || "Lo siento, no pude generar una respuesta.",
-        sender: "bot",
+        text: botText || 'No pude generar una respuesta en este momento.',
+        sender: 'bot',
       };
-
       const finalMessages = [...messagesWithUser, botMessage];
       setMessages(finalMessages);
-      await guardarCharla(finalMessages, userMessage.text);
-    } catch (err) {
-      console.log("Error procesando pregunta:", err);
-      const errorMessages: ChatMessage[] = [
-        ...messagesWithUser,
-        {
-          id: Date.now().toString(),
-          text: "El servicio de IA no pudo responder ahora. Revisa tus créditos, conexión o cambia de proveedor en la configuración.",
-          sender: "bot",
-        },
-      ];
-      setMessages(errorMessages);
-      await guardarCharla(errorMessages, userMessage.text);
+      await saveConversation(finalMessages, messageText);
+    } catch (error: any) {
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 2).toString(),
+        text: `No pude responder: ${error.message || String(error)}`,
+        sender: 'bot',
+      };
+      const finalMessages = [...messagesWithUser, errorMessage];
+      setMessages(finalMessages);
+      await saveConversation(finalMessages, messageText);
     } finally {
       setLoading(false);
     }
   }
 
-  const selectedSubject = materias.find((item) => item.id === materiaId);
-  const selectedClass = clases.find((item) => item.id === classId);
-  const selectedSession =
-    chatSessions.find((item) => item.id === chatSessionId) ||
-    allChatSessions.find((item) => item.id === chatSessionId);
-  const providerLabel = aiProvider === "openai" ? "GPT / OpenAI" : "Gemini";
-
-  function getSessionContextLabel(session: ChatSession): string {
-    const subjectName =
-      materias.find((item) => item.id === session.subjectId)?.name ||
-      "Materia guardada";
-    const classTitle = session.classTitle || "Clase guardada";
-    return `${subjectName} · ${classTitle}`;
+  function openActions(session: ChatSession) {
+    setActionSession(session);
   }
 
-  function renderHistoryCard(session: ChatSession) {
-    const isActive = session.id === chatSessionId;
+  function beginRename(session: ChatSession) {
+    setActionSession(null);
+    setRenameText(session.title);
+    setEditingSessionId(session.id);
+    setRenameVisible(true);
+  }
 
-    return (
-      <Pressable
-        key={session.id}
-        style={[
-          styles.chatHistoryCard,
-          { backgroundColor: colors.card, borderColor: colors.border },
-          isActive && {
-            borderColor: colors.primary,
-            backgroundColor: colors.primarySoft,
+  async function saveRename() {
+    if (!editingSessionId || !renameText.trim()) return;
+    const updated = await chatSessionRepository.rename(editingSessionId, renameText);
+    setRenameVisible(false);
+    setEditingSessionId(null);
+    setRenameText('');
+    await refreshSessions();
+    if (updated && currentSessionId === updated.id) setCurrentSessionId(updated.id);
+  }
+
+  async function beginEditContext(session: ChatSession) {
+    setActionSession(null);
+    const classData = await listAudioNotesUseCase.execute(session.subjectId);
+    setConfigMode('edit');
+    setEditingSessionId(session.id);
+    setConfigSubjectId(session.subjectId);
+    setConfigClasses(classData);
+    setConfigClassId(session.classId);
+    setConfigProvider(session.aiProvider || 'gemini');
+    setConfigWebSearch(session.webSearchEnabled || false);
+    setConfigVisible(true);
+  }
+
+  function confirmDelete(session: ChatSession) {
+    setActionSession(null);
+    Alert.alert(
+      'Eliminar chat',
+      `¿Desea eliminar “${session.title}” y todo su historial local?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            await chatSessionRepository.delete(session.id);
+            if (currentSessionId === session.id) {
+              setCurrentSessionId(null);
+              setMessages([]);
+              setView('list');
+            }
+            await refreshSessions();
           },
-        ]}
-        onPress={() => abrirCharlaGuardada(session)}
-      >
-        <View
-          style={[
-            styles.chatHistoryAvatar,
-            { backgroundColor: colors.primarySoft },
-          ]}
-        >
-          <MessageSquare color={colors.primary} size={21} />
-        </View>
-        <View style={styles.chatHistoryBody}>
-          <Text
-            style={[styles.chatHistoryTitle, { color: colors.text }]}
-            numberOfLines={1}
-          >
-            {session.title}
-          </Text>
-          <Text
-            style={[styles.chatHistoryMeta, { color: colors.muted }]}
-            numberOfLines={1}
-          >
-            {getSessionContextLabel(session)}
-          </Text>
-          <Text
-            style={[styles.chatHistoryPreview, { color: colors.muted }]}
-            numberOfLines={1}
-          >
-            {session.messages[session.messages.length - 1]?.text ||
-              "Sin mensajes todavía"}
-          </Text>
-        </View>
-        <Text style={[styles.chatHistoryDate, { color: colors.muted }]}>
-          {formatSessionDate(session.updatedAt)}
-        </Text>
-      </Pressable>
+        },
+      ],
     );
   }
 
-  function renderSetupForm(embedded = false) {
+  const filteredSessions = useMemo(() => {
+    const query = chatSearch.trim().toLowerCase();
+    return sessions.filter((session) => {
+      if (subjectFilter !== ALL_SUBJECTS && session.subjectId !== subjectFilter) return false;
+      if (!query) return true;
+      const subjectName = subjects.find((item) => item.id === session.subjectId)?.name || '';
+      return [session.title, session.classTitle || '', subjectName]
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [chatSearch, sessions, subjectFilter, subjects]);
+
+  const sessionGroups = useMemo(
+    () =>
+      subjects
+        .map((subject) => ({
+          subject,
+          chats: filteredSessions.filter((session) => session.subjectId === subject.id),
+        }))
+        .filter((group) => group.chats.length > 0),
+    [filteredSessions, subjects],
+  );
+
+  if (view === 'list') {
     return (
-      <>
-        <View style={styles.pickerContainer}>
-          <Text style={[styles.pickerLabel, { color: colors.text }]}>
-            Materia
-          </Text>
-          <View
-            style={[
-              styles.pickerWrapper,
-              { backgroundColor: colors.input, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              selectedValue={materiaId}
-              onValueChange={(itemValue) => setMateriaId(String(itemValue))}
-              style={[styles.picker, { color: colors.text }]}
-              dropdownIconColor={colors.primary}
-            >
-              {materias.length === 0 && (
-                <Picker.Item
-                  label="No hay materias disponibles"
-                  value=""
-                  color="#999"
-                />
-              )}
-              {materias.map((sub) => (
-                <Picker.Item key={sub.id} label={sub.name} value={sub.id} />
-              ))}
-            </Picker>
+      <View style={styles.screen}>
+        <View style={styles.listHeader}>
+          <View>
+            <Text style={styles.listTitle}>Tutor IA</Text>
+            <Text style={styles.listSubtitle}>Continúa una conversación o crea un tutor por clase</Text>
+          </View>
+          <View style={styles.chatCountBox}>
+            <Text style={styles.chatCount}>{sessions.length}</Text>
           </View>
         </View>
 
-        <View style={styles.pickerContainerSecondary}>
-          <Text style={[styles.pickerLabel, { color: colors.text }]}>
-            Clase o tema
-          </Text>
-          <View
-            style={[
-              styles.pickerWrapper,
-              { backgroundColor: colors.input, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              selectedValue={classId}
-              onValueChange={(itemValue) => setClassId(String(itemValue))}
-              style={[styles.picker, { color: colors.text }]}
-              dropdownIconColor={colors.primary}
-            >
-              {clases.length === 0 && (
-                <Picker.Item
-                  label="No hay clases procesadas"
-                  value=""
-                  color="#999"
-                />
-              )}
-              {clases.map((item) => (
-                <Picker.Item key={item.id} label={item.title} value={item.id} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-
-        <View style={styles.twoColumns}>
-          <View style={styles.column}>
-            <Text style={[styles.pickerLabel, { color: colors.text }]}>
-              Proveedor IA
-            </Text>
-            <View
-              style={[
-                styles.pickerWrapper,
-                { backgroundColor: colors.input, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                selectedValue={aiProvider}
-                onValueChange={(value) => setAiProvider(value as AIProvider)}
-                style={[styles.picker, { color: colors.text }]}
-                dropdownIconColor={colors.primary}
-              >
-                <Picker.Item label="Gemini · básico" value="gemini" />
-                <Picker.Item label="GPT / OpenAI" value="openai" />
-              </Picker>
-            </View>
-          </View>
-
-          <View style={styles.column}>
-            <Text style={[styles.pickerLabel, { color: colors.text }]}>
-              Modo
-            </Text>
-            <View
-              style={[
-                styles.pickerWrapper,
-                { backgroundColor: colors.input, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                selectedValue={contentType}
-                onValueChange={(value) =>
-                  setContentType(value as ClassContentType)
-                }
-                style={[styles.picker, { color: colors.text }]}
-                dropdownIconColor={colors.primary}
-              >
-                <Picker.Item label="General" value="general" />
-                <Picker.Item label="Teoría" value="theory" />
-                <Picker.Item label="Matemática" value="math" />
-                <Picker.Item label="Imágenes/doc." value="image" />
-              </Picker>
-            </View>
-          </View>
-        </View>
-
-        {chatSessions.length > 0 && (
-          <View style={styles.pickerContainerSecondary}>
-            <Text style={[styles.pickerLabel, { color: colors.text }]}>
-              Conversaciones de esta clase
-            </Text>
-            <View
-              style={[
-                styles.pickerWrapper,
-                { backgroundColor: colors.input, borderColor: colors.border },
-              ]}
-            >
-              <Picker
-                selectedValue={chatSessionId || "__new__"}
-                onValueChange={(value) => continuarCharla(String(value))}
-                style={[styles.picker, { color: colors.text }]}
-                dropdownIconColor={colors.primary}
-              >
-                <Picker.Item label="Nueva charla" value="__new__" />
-                {chatSessions.map((session) => (
-                  <Picker.Item
-                    key={session.id}
-                    label={`${session.title} · ${new Date(session.updatedAt).toLocaleDateString()}`}
-                    value={session.id}
-                  />
-                ))}
-              </Picker>
-            </View>
-          </View>
-        )}
-
-        <Pressable
-          style={[styles.startChatButton, { backgroundColor: colors.primary }]}
-          onPress={
-            embedded
-              ? () => setSettingsOpen(false)
-              : iniciarNuevaCharlaConfigurada
-          }
-        >
-          <Text style={styles.startChatButtonText}>
-            {embedded ? "Aplicar configuración" : "Iniciar conversación"}
-          </Text>
-        </Pressable>
-      </>
-    );
-  }
-
-  function renderHistoryScreen() {
-    return (
-      <View style={styles.modeScreen}>
-        <View style={styles.historyHeader}>
-          <View style={styles.historyHeaderText}>
-            <Text style={[styles.modeTitle, { color: colors.text }]}>
-              Chats del Tutor IA
-            </Text>
-            <Text style={[styles.modeSubtitle, { color: colors.muted }]}>
-              Elige una conversación anterior o crea una nueva.
-            </Text>
-          </View>
-          <Pressable
-            style={[styles.newChatButton, { backgroundColor: colors.primary }]}
-            onPress={abrirConfiguracionNueva}
-          >
-            <PlusCircle color="#fff" size={18} />
-            <Text style={styles.newChatButtonText}>Nueva</Text>
-          </Pressable>
-        </View>
-
-        <FlatList
-          data={allChatSessions}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.historyListContent}
-          renderItem={({ item }) => renderHistoryCard(item)}
-          ListEmptyComponent={
-            <View
-              style={[
-                styles.emptyChatsBox,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <Bot color={colors.primary} size={42} />
-              <Text style={[styles.emptyChatsTitle, { color: colors.text }]}>
-                Aún no tienes chats guardados
-              </Text>
-              <Text style={[styles.emptyChatsText, { color: colors.muted }]}>
-                Crea una conversación, selecciona materia y clase, y luego
-                aparecerá aquí para continuarla.
-              </Text>
-              <Pressable
-                style={[
-                  styles.emptyNewButton,
-                  { backgroundColor: colors.primarySoft },
-                ]}
-                onPress={abrirConfiguracionNueva}
-              >
-                <Text
-                  style={[styles.emptyNewButtonText, { color: colors.primary }]}
-                >
-                  Crear primera conversación
-                </Text>
-              </Pressable>
-            </View>
-          }
-        />
-      </View>
-    );
-  }
-
-  function renderSetupScreen() {
-    return (
-      <View style={styles.modeScreen}>
-        <View style={styles.setupHeader}>
-          <Pressable
-            style={[styles.backButton, { backgroundColor: colors.primarySoft }]}
-            onPress={abrirListaChats}
-          >
-            <ArrowLeft color={colors.primary} size={18} />
-          </Pressable>
-          <View style={styles.historyHeaderText}>
-            <Text style={[styles.modeTitle, { color: colors.text }]}>
-              Nueva conversación
-            </Text>
-            <Text style={[styles.modeSubtitle, { color: colors.muted }]}>
-              Primero configura el chat y luego empieza a conversar.
-            </Text>
-          </View>
+        <View style={styles.searchBox}>
+          <Search color={colors.muted} size={18} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar conversación"
+            placeholderTextColor={colors.muted}
+            value={chatSearch}
+            onChangeText={setChatSearch}
+          />
         </View>
 
         <ScrollView
-          style={[
-            styles.setupCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-          contentContainerStyle={styles.setupCardContent}
-          keyboardShouldPersistTaps="handled"
+          horizontal
+          style={styles.filterScroll}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
         >
-          {renderSetupForm(false)}
+          <Pressable
+            style={[styles.filterChip, subjectFilter === ALL_SUBJECTS && styles.filterChipActive]}
+            onPress={() => setSubjectFilter(ALL_SUBJECTS)}
+          >
+            <Text style={[styles.filterChipText, subjectFilter === ALL_SUBJECTS && styles.filterChipTextActive]}>Todas</Text>
+          </Pressable>
+          {subjects.map((subject) => (
+            <Pressable
+              key={subject.id}
+              style={[styles.filterChip, subjectFilter === subject.id && styles.filterChipActive]}
+              onPress={() => setSubjectFilter(subject.id)}
+            >
+              <Text style={[styles.filterChipText, subjectFilter === subject.id && styles.filterChipTextActive]}>{subject.name}</Text>
+            </Pressable>
+          ))}
         </ScrollView>
+
+        <ScrollView
+          style={styles.groupScroll}
+          contentContainerStyle={
+            sessionGroups.length ? styles.groupContent : styles.groupContentEmpty
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          {sessionGroups.length === 0 ? (
+            <View style={styles.emptyChats}>
+              <View style={styles.emptyChatIcon}>
+                <MessageCircle color={colors.primary} size={34} />
+              </View>
+              <Text style={styles.emptyChatsTitle}>Aún no hay conversaciones</Text>
+              <Text style={styles.emptyChatsText}>
+                Crea un chat, elige una materia, una clase y el modelo de IA. El historial quedará guardado para continuar después.
+              </Text>
+            </View>
+          ) : (
+            sessionGroups.map(({ subject, chats }) => {
+              const expanded = expandedSubjects[subject.id] !== false;
+              return (
+                <View
+                  key={subject.id}
+                  style={[
+                    styles.subjectGroup,
+                    { borderColor: getPastelBorder(subject.color, colors.border) },
+                  ]}
+                >
+                  <Pressable
+                    style={styles.subjectGroupHeader}
+                    onPress={() =>
+                      setExpandedSubjects((current) => ({
+                        ...current,
+                        [subject.id]: !expanded,
+                      }))
+                    }
+                  >
+                    <View style={[styles.subjectDot, { backgroundColor: subject.color || colors.primary }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.subjectGroupTitle}>{subject.name}</Text>
+                      <Text style={styles.subjectGroupCount}>{chats.length} conversación(es)</Text>
+                    </View>
+                    <ChevronDown
+                      color={colors.muted}
+                      size={20}
+                      style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}
+                    />
+                  </Pressable>
+
+                  {expanded &&
+                    chats.map((session) => (
+                      <Pressable key={session.id} style={styles.chatRow} onPress={() => openSession(session)}>
+                        <View style={styles.chatIcon}>
+                          <Bot color={colors.primary} size={20} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.chatRowTitle} numberOfLines={1}>{session.title}</Text>
+                          <Text style={styles.chatRowSubtitle} numberOfLines={1}>
+                            {session.classTitle || 'Clase'} · {getSessionPreview(session)}
+                          </Text>
+                          <View style={styles.modelLine}>
+                            <Text style={styles.modelLineText}>{AI_PROVIDER_LABELS[session.aiProvider || 'gemini']}</Text>
+                            {session.webSearchEnabled && <Globe2 color={colors.primary} size={12} />}
+                          </View>
+                        </View>
+                        <View style={styles.chatRightBox}>
+                          <Text style={styles.chatDate}>{formatUpdatedAt(session.updatedAt)}</Text>
+                          <Pressable
+                            style={styles.moreButton}
+                            onPress={(event) => {
+                              event.stopPropagation();
+                              openActions(session);
+                            }}
+                          >
+                            <MoreVertical color={colors.muted} size={20} />
+                          </Pressable>
+                        </View>
+                      </Pressable>
+                    ))}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        <Pressable style={styles.fab} onPress={() => openNewChatConfig()} accessibilityLabel="Crear nuevo chat">
+          <Plus color="#fff" size={29} />
+        </Pressable>
+        <AppBottomBar activeTab="Chatbot" />
+
+        {renderModals()}
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {screenMode === "history" ? (
-        renderHistoryScreen()
-      ) : screenMode === "setup" ? (
-        renderSetupScreen()
-      ) : (
-        <KeyboardAvoidingView
-          style={styles.chatArea}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
-        >
-          <View
-            style={[
-              styles.topPanel,
-              {
-                backgroundColor: colors.surface,
-                borderBottomColor: colors.border,
-              },
-            ]}
-          >
-            <View style={styles.topTitleRow}>
-              <Pressable
-                style={[
-                  styles.backButton,
-                  { backgroundColor: colors.primarySoft },
-                ]}
-                onPress={abrirListaChats}
-              >
-                <ArrowLeft color={colors.primary} size={18} />
-              </Pressable>
+    <View style={styles.screen}>
+      <View style={styles.topBar}>
+        <Pressable style={styles.topIconButton} onPress={() => setView('list')}>
+          <ChevronLeft color={colors.primary} size={24} />
+        </Pressable>
+        <View style={styles.topTitleBox}>
+          <Text style={styles.topTitle} numberOfLines={1}>{currentSession?.title || 'Tutor IA'}</Text>
+          <Text style={styles.topSubtitle} numberOfLines={1}>
+            {selectedSubject?.name || 'Materia'} · {selectedClass?.title || currentSession?.classTitle || 'Clase'}
+          </Text>
+        </View>
+        <Pressable style={styles.topIconButton} onPress={() => currentSession && openActions(currentSession)}>
+          <MoreVertical color={colors.text} size={22} />
+        </Pressable>
+      </View>
 
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.screenTitle, { color: colors.text }]}>
-                  Tutor IA por clase
-                </Text>
-                <Text style={[styles.screenSubtitle, { color: colors.muted }]}>
-                  Contexto exacto de la conversación seleccionada.
-                </Text>
-              </View>
+      <View style={styles.contextStrip}>
+        <Sparkles color={colors.purple} size={15} />
+        <Text style={styles.contextStripText} numberOfLines={1}>
+          {currentSession ? AI_PROVIDER_LABELS[currentSession.aiProvider] : 'Tutor IA'}
+          {currentSession?.webSearchEnabled ? ' · apoyo web activado' : ' · enfocado en la clase'}
+        </Text>
+      </View>
 
-              <Pressable
-                style={[
-                  styles.configButton,
-                  {
-                    backgroundColor: colors.primarySoft,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => setSettingsOpen((value) => !value)}
-              >
-                <SlidersHorizontal color={colors.primary} size={17} />
-                <Text
-                  style={[styles.configButtonText, { color: colors.primary }]}
-                >
-                  Configurar
-                </Text>
-                {settingsOpen ? (
-                  <ChevronUp color={colors.primary} size={16} />
-                ) : (
-                  <ChevronDown color={colors.primary} size={16} />
-                )}
+      <KeyboardAvoidingView
+        style={styles.chatArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 82 : 0}
+      >
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item, index) => item.id || `${item.sender}_${index}`}
+          contentContainerStyle={styles.messageList}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item, index }) => {
+            const next = messages[index + 1];
+            const isLastInGroup = !next || next.sender !== item.sender;
+            return <MessageBubble item={{ ...item, id: item.id || `${item.sender}_${index}` }} isLastInGroup={isLastInGroup} />;
+          }}
+          ListFooterComponent={loading ? <TypingIndicator /> : null}
+        />
+
+        <View style={styles.inputArea}>
+          {pendingAttachment && (
+            <View style={styles.attachmentChip}>
+              {pendingAttachment.mimeType.startsWith('image/') ? (
+                <ImageIcon color={colors.primary} size={18} />
+              ) : (
+                <FileText color={colors.primary} size={18} />
+              )}
+              <Text style={styles.attachmentName} numberOfLines={1}>{pendingAttachment.name}</Text>
+              <Pressable onPress={() => setPendingAttachment(null)}>
+                <X color={colors.danger} size={18} />
               </Pressable>
             </View>
+          )}
 
-            <View style={styles.selectionRow}>
-              <View
-                style={[
-                  styles.selectionChip,
-                  { backgroundColor: colors.chip, borderColor: colors.border },
-                ]}
-              >
-                <BookOpen size={14} color={colors.primary} />
-                <Text
-                  style={[styles.selectionChipText, { color: colors.text }]}
-                  numberOfLines={1}
-                >
-                  {selectedSubject?.name || "Sin materia"}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.selectionChip,
-                  styles.classChip,
-                  { backgroundColor: colors.chip, borderColor: colors.border },
-                ]}
-              >
-                <FolderOpen size={14} color={colors.purple} />
-                <Text
-                  style={[styles.selectionChipText, { color: colors.text }]}
-                  numberOfLines={1}
-                >
-                  {selectedClass?.title ||
-                    selectedSession?.classTitle ||
-                    "Sin clase"}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.selectionChip,
-                  { backgroundColor: colors.chip, borderColor: colors.border },
-                ]}
-              >
-                <Sparkles size={14} color={colors.success} />
-                <Text
-                  style={[styles.selectionChipText, { color: colors.text }]}
-                  numberOfLines={1}
-                >
-                  {providerLabel} · {contentType}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.selectionChip,
-                  { backgroundColor: colors.chip, borderColor: colors.border },
-                ]}
-              >
-                <MessageSquare size={14} color={colors.primary} />
-                <Text
-                  style={[styles.selectionChipText, { color: colors.text }]}
-                  numberOfLines={1}
-                >
-                  {selectedSession?.title || "Nueva charla"}
-                </Text>
-              </View>
-            </View>
-
-            {settingsOpen && (
-              <ScrollView
-                style={[
-                  styles.configPanel,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-                contentContainerStyle={styles.configPanelContent}
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-              >
-                {renderSetupForm(true)}
-              </ScrollView>
-            )}
-          </View>
-
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: true })
-            }
-            contentContainerStyle={styles.list}
-            style={styles.chatList}
-            renderItem={({ item, index }) => {
-              const next = messages[index + 1];
-              const isLastInGroup = !next || next.sender !== item.sender;
-              return (
-                <MessageBubble item={item} isLastInGroup={isLastInGroup} />
-              );
-            }}
-            ListFooterComponent={loading ? <TypingIndicator /> : null}
-          />
-
-          <View
-            style={[
-              styles.inputWrapper,
-              {
-                backgroundColor: colors.surface,
-                borderTopColor: colors.border,
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: colors.input },
-                inputFocused && {
-                  borderColor: colors.primary,
-                  backgroundColor: colors.surface,
-                },
-              ]}
+          <View style={styles.inputRow}>
+            <Pressable style={styles.attachButton} onPress={attachFile} disabled={loading}>
+              <Paperclip color={colors.primary} size={21} />
+            </Pressable>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Escribe un mensaje…"
+              placeholderTextColor={colors.muted}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={1000}
+              editable={!loading}
+            />
+            <Pressable
+              style={[styles.sendButton, ((!inputText.trim() && !pendingAttachment) || loading) && styles.sendButtonDisabled]}
+              onPress={sendMessage}
+              disabled={(!inputText.trim() && !pendingAttachment) || loading}
             >
-              <Pressable
-                style={[
-                  styles.attachButton,
-                  { backgroundColor: colors.primarySoft },
-                ]}
-                onPress={adjuntarArchivo}
-                disabled={!materiaId || !classId || loading}
-              >
-                <Paperclip
-                  color={materiaId && classId ? colors.primary : "#94A3B8"}
-                  size={21}
-                />
-              </Pressable>
-
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder={
-                  !materiaId
-                    ? "Selecciona una materia primero..."
-                    : !classId
-                      ? "Selecciona una clase o tema primero..."
-                      : "Escribe tu pregunta aquí..."
-                }
-                value={inputText}
-                onChangeText={setInputText}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => setInputFocused(false)}
-                multiline
-                maxLength={600}
-                placeholderTextColor={colors.muted}
-                editable={!!materiaId && !!classId}
-              />
-
-              <Pressable
-                style={[
-                  styles.sendButton,
-                  { backgroundColor: colors.primary },
-                  (loading || !inputText.trim() || !materiaId || !classId) &&
-                    styles.sendButtonDisabled,
-                ]}
-                onPress={enviarMensaje}
-                disabled={
-                  loading || !inputText.trim() || !materiaId || !classId
-                }
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Send color="#fff" size={22} strokeWidth={2.5} />
-                )}
-              </Pressable>
-            </View>
-            {inputText.length > 500 && (
-              <Text style={[styles.charCount, { color: colors.muted }]}>
-                {inputText.length}/600
-              </Text>
-            )}
+              {loading ? <ActivityIndicator color="#fff" size="small" /> : <Send color="#fff" size={21} />}
+            </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      )}
+        </View>
+      </KeyboardAvoidingView>
 
-      {!keyboardVisible && (
-        <AppBottomBar activeTab="Chatbot" subjectId={materiaId} />
-      )}
+      {!keyboardVisible && <AppBottomBar activeTab="Chatbot" />}
+      {renderModals()}
     </View>
+  );
+
+  function renderModals() {
+    return (
+      <>
+        <ChatConfigModal
+          visible={configVisible}
+          mode={configMode}
+          subjects={subjects}
+          classes={configClasses}
+          subjectId={configSubjectId}
+          classId={configClassId}
+          provider={configProvider}
+          webSearchEnabled={configWebSearch}
+          onChangeSubject={changeConfigSubject}
+          onChangeClass={setConfigClassId}
+          onChangeProvider={changeProvider}
+          onToggleWebSearch={() => setConfigWebSearch((value) => !value)}
+          onClose={() => setConfigVisible(false)}
+          onSave={createOrUpdateChat}
+        />
+
+        <ChatActionsModal
+          session={actionSession}
+          onClose={() => setActionSession(null)}
+          onRename={() => actionSession && beginRename(actionSession)}
+          onChangeContext={() => actionSession && beginEditContext(actionSession)}
+          onDelete={() => actionSession && confirmDelete(actionSession)}
+        />
+
+        <RenameChatModal
+          visible={renameVisible}
+          value={renameText}
+          onChange={setRenameText}
+          onClose={() => setRenameVisible(false)}
+          onSave={saveRename}
+        />
+      </>
+    );
+  }
+}
+
+function ChatConfigModal({
+  visible,
+  mode,
+  subjects,
+  classes,
+  subjectId,
+  classId,
+  provider,
+  webSearchEnabled,
+  onChangeSubject,
+  onChangeClass,
+  onChangeProvider,
+  onToggleWebSearch,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  mode: ConfigMode;
+  subjects: Subject[];
+  classes: AudioNote[];
+  subjectId: string;
+  classId: string;
+  provider: AIProvider;
+  webSearchEnabled: boolean;
+  onChangeSubject: (value: string) => void;
+  onChangeClass: (value: string) => void;
+  onChangeProvider: (value: AIProvider) => void;
+  onToggleWebSearch: () => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalBackdrop}>
+        <View style={styles.configModal}>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>{mode === 'new' ? 'Nuevo chat' : 'Cambiar tema del chat'}</Text>
+              <Text style={styles.modalSubtitle}>Elige el contexto antes de conversar</Text>
+            </View>
+            <Pressable style={styles.closeButton} onPress={onClose}>
+              <X color={colors.text} size={21} />
+            </Pressable>
+          </View>
+
+          <Text style={styles.fieldLabel}>1. Materia</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker selectedValue={subjectId} onValueChange={onChangeSubject} style={{ color: colors.text }} dropdownIconColor={colors.text}>
+              {!subjects.length && <Picker.Item label="No hay materias" value="" color={colors.text} />}
+              {subjects.map((subject) => <Picker.Item key={subject.id} label={subject.name} value={subject.id} color={colors.text} />)}
+            </Picker>
+          </View>
+
+          <Text style={styles.fieldLabel}>2. Clase o audio procesado</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker selectedValue={classId} onValueChange={onChangeClass} style={{ color: colors.text }} dropdownIconColor={colors.text}>
+              {!classes.length && <Picker.Item label="No hay clases procesadas" value="" color={colors.text} />}
+              {classes.map((item) => <Picker.Item key={item.id} label={item.title} value={item.id} color={colors.text} />)}
+            </Picker>
+          </View>
+
+          <Text style={styles.fieldLabel}>3. Modelo de IA</Text>
+          <View style={styles.providerRow}>
+            {(['gemini', 'openai'] as AIProvider[]).map((item) => (
+              <Pressable
+                key={item}
+                style={[styles.providerCard, provider === item && styles.providerCardActive]}
+                onPress={() => onChangeProvider(item)}
+              >
+                <Bot color={provider === item ? '#fff' : colors.primary} size={20} />
+                <Text style={[styles.providerText, provider === item && styles.providerTextActive]}>
+                  {item === 'gemini' ? 'Gemini' : 'OpenAI'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable
+            style={[styles.webToggle, provider !== 'openai' && styles.webToggleDisabled]}
+            onPress={provider === 'openai' ? onToggleWebSearch : undefined}
+          >
+            <Globe2 color={provider === 'openai' ? colors.primary : colors.muted} size={21} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.webToggleTitle}>Apoyo con búsqueda web</Text>
+              <Text style={styles.webToggleText}>
+                {provider === 'openai'
+                  ? 'Busca fuentes relacionadas sin abandonar el tema de la clase.'
+                  : 'Disponible al seleccionar OpenAI.'}
+              </Text>
+            </View>
+            <View style={[styles.checkbox, webSearchEnabled && provider === 'openai' && styles.checkboxActive]}>
+              {webSearchEnabled && provider === 'openai' && <View style={styles.checkboxDot} />}
+            </View>
+          </Pressable>
+
+          <Pressable style={[styles.saveConfigButton, (!subjectId || !classId) && styles.disabled]} onPress={onSave} disabled={!subjectId || !classId}>
+            <Text style={styles.saveConfigText}>{mode === 'new' ? 'Crear chat' : 'Guardar cambios'}</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  chatArea: {
-    flex: 1,
-  },
-  modeScreen: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  historyHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
-  },
-  historyHeaderText: {
-    flex: 1,
-  },
-  modeTitle: {
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  modeSubtitle: {
-    marginTop: 4,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
-  newChatButton: {
-    minHeight: 42,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  newChatButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  historyListContent: {
-    paddingBottom: 16,
-    gap: 10,
-  },
-  chatHistoryCard: {
-    minHeight: 78,
-    borderWidth: 1,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  chatHistoryAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chatHistoryBody: {
-    flex: 1,
-  },
-  chatHistoryTitle: {
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  chatHistoryMeta: {
-    marginTop: 2,
-    fontSize: 11.5,
-    fontWeight: "700",
-  },
-  chatHistoryPreview: {
-    marginTop: 3,
-    fontSize: 11.5,
-    fontWeight: "500",
-  },
-  chatHistoryDate: {
-    fontSize: 10.5,
-    fontWeight: "800",
-  },
-  emptyChatsBox: {
-    marginTop: 26,
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: 22,
-    alignItems: "center",
-  },
-  emptyChatsTitle: {
-    marginTop: 12,
-    fontSize: 17,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  emptyChatsText: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  emptyNewButton: {
-    marginTop: 14,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  emptyNewButtonText: {
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  setupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  setupCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: 14,
-  },
-  setupCardContent: {
-    paddingBottom: 16,
-  },
-  startChatButton: {
-    marginTop: 16,
-    minHeight: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  startChatButtonText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  topPanel: {
-    paddingHorizontal: 15,
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-  },
-  topTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  screenTitle: {
-    fontSize: 19,
-    fontWeight: "900",
-  },
-  screenSubtitle: {
-    marginTop: 3,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  configButton: {
-    minHeight: 38,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  configButtonText: {
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  selectionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-  },
-  selectionChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    maxWidth: 150,
-  },
-  classChip: {
-    maxWidth: 230,
-  },
-  selectionChipText: {
-    fontSize: 12,
-    fontWeight: "700",
-    flexShrink: 1,
-  },
-  configPanel: {
-    marginTop: 12,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 12,
-    maxHeight: 430,
-  },
-  configPanelContent: {
-    paddingBottom: 2,
-  },
-  pickerContainer: {
-    marginTop: 0,
-  },
-  pickerContainerSecondary: {
-    marginTop: 10,
-  },
-  pickerLabel: {
-    fontSize: 12,
-    fontWeight: "900",
-    marginBottom: 6,
-  },
-  pickerWrapper: {
-    borderRadius: 14,
-    minHeight: 48,
-    justifyContent: "center",
-    overflow: "hidden",
-    borderWidth: 1,
-  },
-  picker: {
-    width: "100%",
-  },
-  configHelp: {
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: -4,
-    marginBottom: 8,
-    fontWeight: "600",
-  },
-  globalHistoryList: {
-    gap: 8,
-  },
-  emptyHistoryCard: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  emptyHistoryText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  historyItem: {
-    minHeight: 56,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  historyIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  historyTextBox: {
-    flex: 1,
-  },
-  historyTitle: {
-    fontSize: 12.5,
-    fontWeight: "900",
-  },
-  historyMeta: {
-    marginTop: 2,
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  historyDate: {
-    fontSize: 10.5,
-    fontWeight: "800",
-  },
-  twoColumns: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 10,
-  },
-  column: {
-    flex: 1,
-  },
-  basicButton: {
-    marginTop: 12,
-    minHeight: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-  },
-  basicButtonText: {
-    fontSize: 12,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  chatList: {
-    flex: 1,
-  },
-  list: {
-    paddingHorizontal: 15,
-    paddingTop: 14,
-    paddingBottom: 10,
-    flexGrow: 1,
-  },
-  inputWrapper: {
-    borderTopWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: "transparent",
-    paddingLeft: 4,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: "transparent",
-    borderRadius: 25,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
-    fontSize: 16,
-    maxHeight: 130,
-    minHeight: 52,
-  },
-  attachButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 6,
-  },
-  sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    margin: 2,
-    boxShadow: "0px 4px 8px rgba(37, 99, 235, 0.24)",
-  },
-  sendButtonDisabled: {
-    opacity: 0.45,
-  },
-  charCount: {
-    fontSize: 11,
-    textAlign: "right",
-    marginTop: 4,
-    marginRight: 4,
-  },
-});
+function ChatActionsModal({
+  session,
+  onClose,
+  onRename,
+  onChangeContext,
+  onDelete,
+}: {
+  session: ChatSession | null;
+  onClose: () => void;
+  onRename: () => void;
+  onChangeContext: () => void;
+  onDelete: () => void;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <Modal visible={!!session} transparent animationType="fade">
+      <View style={styles.modalBackdrop}>
+        <View style={styles.actionsModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle} numberOfLines={1}>{session?.title || 'Opciones del chat'}</Text>
+            <Pressable style={styles.closeButton} onPress={onClose}><X color={colors.text} size={21} /></Pressable>
+          </View>
+          <Pressable style={styles.actionRow} onPress={onRename}>
+            <Pencil color={colors.primary} size={20} />
+            <Text style={styles.actionText}>Editar título</Text>
+          </Pressable>
+          <Pressable style={styles.actionRow} onPress={onChangeContext}>
+            <BookOpen color={colors.purple} size={20} />
+            <Text style={styles.actionText}>Cambiar materia, clase o modelo</Text>
+          </Pressable>
+          <Pressable style={[styles.actionRow, styles.dangerAction]} onPress={onDelete}>
+            <Trash2 color={colors.danger} size={20} />
+            <Text style={[styles.actionText, { color: colors.danger }]}>Eliminar chat</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function RenameChatModal({
+  visible,
+  value,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalBackdrop}>
+        <View style={styles.actionsModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Editar título</Text>
+            <Pressable style={styles.closeButton} onPress={onClose}><X color={colors.text} size={21} /></Pressable>
+          </View>
+          <TextInput
+            style={styles.renameInput}
+            value={value}
+            onChangeText={onChange}
+            placeholder="Título del chat"
+            placeholderTextColor={colors.muted}
+            autoFocus
+          />
+          <Pressable style={[styles.saveConfigButton, !value.trim() && styles.disabled]} onPress={onSave} disabled={!value.trim()}>
+            <Text style={styles.saveConfigText}>Guardar título</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function createStyles(colors: ReturnType<typeof useAppTheme>['colors']) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.background },
+    listHeader: { paddingHorizontal: 17, paddingTop: 8, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    listTitle: { color: colors.text, fontSize: 26, fontWeight: '900' },
+    listSubtitle: { color: colors.muted, fontSize: 11.5, marginTop: 3 },
+    chatCountBox: { minWidth: 42, height: 42, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    chatCount: { color: colors.primary, fontWeight: '900', fontSize: 15 },
+    searchBox: { minHeight: 47, borderRadius: 15, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, marginHorizontal: 16, gap: 8 },
+    searchInput: { flex: 1, color: colors.text, fontSize: 13.5 },
+    filterScroll: { flexGrow: 0, flexShrink: 0, height: 58 },
+    filterRow: { paddingHorizontal: 16, paddingVertical: 11, gap: 7, alignItems: 'center' },
+    filterChip: { height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 13 },
+    filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    filterChipText: { color: colors.text, fontSize: 11.5, fontWeight: '800' },
+    filterChipTextActive: { color: '#fff' },
+    groupScroll: { flex: 1, marginTop: 0 },
+    groupContent: { flexGrow: 0, paddingHorizontal: 14, paddingTop: 0, paddingBottom: 100 },
+    groupContentEmpty: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 14, paddingBottom: 100 },
+    emptyChats: { alignItems: 'center', paddingHorizontal: 28, paddingVertical: 24 },
+    emptyChatIcon: { width: 76, height: 76, borderRadius: 25, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    emptyChatsTitle: { color: colors.text, fontSize: 17, fontWeight: '900', marginTop: 13 },
+    emptyChatsText: { color: colors.muted, fontSize: 11.5, lineHeight: 18, textAlign: 'center', marginTop: 6 },
+    subjectGroup: { backgroundColor: colors.card, borderRadius: 18, borderWidth: 1.4, borderColor: colors.border, marginBottom: 10, overflow: 'hidden' },
+    subjectGroupHeader: { minHeight: 61, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, gap: 10 },
+    subjectDot: { width: 9, height: 42, borderRadius: 99 },
+    subjectGroupTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
+    subjectGroupCount: { color: colors.muted, fontSize: 10.5, marginTop: 2 },
+    chatRow: { minHeight: 82, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 10 },
+    chatIcon: { width: 46, height: 46, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    chatRowTitle: { color: colors.text, fontSize: 13.5, fontWeight: '900' },
+    chatRowSubtitle: { color: colors.muted, fontSize: 10.5, marginTop: 3 },
+    modelLine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+    modelLineText: { color: colors.primary, fontSize: 9.5, fontWeight: '800' },
+    chatRightBox: { alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch', paddingVertical: 10 },
+    chatDate: { color: colors.muted, fontSize: 9.5 },
+    moreButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+    fab: { position: 'absolute', right: 20, bottom: 92, width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 24px rgba(37,99,235,0.35)' },
+    topBar: { minHeight: 66, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 10 },
+    topIconButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    topTitleBox: { flex: 1 },
+    topTitle: { color: colors.text, fontSize: 15.5, fontWeight: '900' },
+    topSubtitle: { color: colors.muted, fontSize: 10.5, marginTop: 2 },
+    contextStrip: { minHeight: 38, backgroundColor: colors.soft, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
+    contextStripText: { color: colors.muted, fontSize: 10.5, fontWeight: '800' },
+    chatArea: { flex: 1 },
+    messageList: { flexGrow: 1, paddingHorizontal: 12, paddingTop: 15, paddingBottom: 12 },
+    inputArea: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
+    attachmentChip: { minHeight: 40, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.primarySoft, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 8, marginBottom: 7 },
+    attachmentName: { flex: 1, color: colors.text, fontSize: 11.5, fontWeight: '800' },
+    inputRow: { minHeight: 54, borderRadius: 27, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.input, flexDirection: 'row', alignItems: 'flex-end', padding: 3, gap: 3 },
+    attachButton: { width: 45, height: 45, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+    textInput: { flex: 1, minHeight: 46, maxHeight: 120, color: colors.text, fontSize: 15, paddingHorizontal: 7, paddingTop: 12, paddingBottom: 11, textAlignVertical: 'center' },
+    sendButton: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    sendButtonDisabled: { opacity: 0.4 },
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.58)', alignItems: 'center', justifyContent: 'center', padding: 18 },
+    configModal: { width: '100%', maxHeight: '90%', backgroundColor: colors.card, borderRadius: 23, padding: 16, borderWidth: 1, borderColor: colors.border },
+    actionsModal: { width: '100%', backgroundColor: colors.card, borderRadius: 23, padding: 16, borderWidth: 1, borderColor: colors.border },
+    modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 },
+    modalTitle: { flex: 1, color: colors.text, fontSize: 18, fontWeight: '900' },
+    modalSubtitle: { color: colors.muted, fontSize: 11, marginTop: 2 },
+    closeButton: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
+    fieldLabel: { color: colors.text, fontSize: 12, fontWeight: '900', marginTop: 10, marginBottom: 7 },
+    pickerWrapper: { minHeight: 49, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', backgroundColor: colors.input, justifyContent: 'center' },
+    providerRow: { flexDirection: 'row', gap: 9 },
+    providerCard: { flex: 1, minHeight: 58, borderRadius: 15, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.input, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+    providerCardActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    providerText: { color: colors.text, fontSize: 12, fontWeight: '900' },
+    providerTextActive: { color: '#fff' },
+    webToggle: { minHeight: 72, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.soft, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginTop: 12 },
+    webToggleDisabled: { opacity: 0.58 },
+    webToggleTitle: { color: colors.text, fontSize: 12.5, fontWeight: '900' },
+    webToggleText: { color: colors.muted, fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+    checkbox: { width: 25, height: 25, borderRadius: 9, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+    checkboxActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+    checkboxDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
+    saveConfigButton: { minHeight: 51, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+    saveConfigText: { color: '#fff', fontSize: 13.5, fontWeight: '900' },
+    disabled: { opacity: 0.42 },
+    actionRow: { minHeight: 56, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 4 },
+    dangerAction: { marginTop: 2 },
+    actionText: { color: colors.text, fontSize: 13, fontWeight: '850' as any },
+    renameInput: { height: 50, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.input, color: colors.text, paddingHorizontal: 13, fontSize: 14 },
+  });
+}

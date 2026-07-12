@@ -1,14 +1,14 @@
-import React, { useRef, useEffect } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
-import Markdown from "react-native-markdown-display";
-import { Bot, User } from "lucide-react-native";
-import { COLORS } from "../components/ui/Colors";
-import formateoTime from "../utils/formateoTime";
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import Markdown from 'react-native-markdown-display';
+import { Bot, User } from 'lucide-react-native';
+import formateoTime from './formateoTime';
+import { useAppTheme } from '../components/ui/ThemeContext';
 
 type Props = {
   id: string;
   text: string;
-  sender: "user" | "bot";
+  sender: 'user' | 'bot';
 };
 
 export default function MessageBubble({
@@ -18,17 +18,13 @@ export default function MessageBubble({
   item: Props;
   isLastInGroup: boolean;
 }) {
-  const fadeRef = useRef<Animated.Value | null>(null);
-  const slideRef = useRef<Animated.Value | null>(null);
-
-  if (!fadeRef.current) fadeRef.current = new Animated.Value(0);
-  if (!slideRef.current) slideRef.current = new Animated.Value(10);
-
-  const fade = fadeRef.current;
-  const slide = slideRef.current;
+  const { colors, isDark } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(10)).current;
 
   useEffect(() => {
-    Animated.parallel([
+    const animation = Animated.parallel([
       Animated.timing(fade, {
         toValue: 1,
         duration: 220,
@@ -39,10 +35,12 @@ export default function MessageBubble({
         duration: 220,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]);
+    animation.start();
+    return () => animation.stop();
   }, [fade, slide]);
 
-  const isUser = item.sender === "user";
+  const isUser = item.sender === 'user';
   const time = formateoTime(item.id);
 
   return (
@@ -55,17 +53,12 @@ export default function MessageBubble({
       ]}
     >
       {!isUser && (
-        <View
-          style={[
-            styles.avatarPlaceholder,
-            !isLastInGroup && styles.avatarHidden,
-          ]}
-        >
+        <View style={[styles.avatarPlaceholder, !isLastInGroup && styles.avatarHidden]}>
           {isLastInGroup && <Bot color="#fff" size={18} strokeWidth={2.2} />}
         </View>
       )}
 
-      <View style={{ maxWidth: "78%" }}>
+      <View style={{ maxWidth: '82%' }}>
         <View
           style={[
             styles.messageBubble,
@@ -76,33 +69,16 @@ export default function MessageBubble({
           ]}
         >
           {isUser ? (
-            <Text style={[styles.messageText, styles.userText]}>
-              {item.text}
-            </Text>
+            <Text style={[styles.messageText, styles.userText]}>{item.text}</Text>
           ) : (
             <Markdown
               style={{
                 body: { ...styles.messageText, ...styles.botText },
-                heading1: {
-                  fontSize: 22,
-                  fontWeight: "bold",
-                  color: COLORS.text,
-                  marginBottom: 8,
-                },
-                heading2: {
-                  fontSize: 20,
-                  fontWeight: "bold",
-                  color: COLORS.text,
-                  marginBottom: 6,
-                },
-                heading3: {
-                  fontSize: 18,
-                  fontWeight: "bold",
-                  color: COLORS.text,
-                  marginBottom: 4,
-                },
-                strong: { fontWeight: "bold" },
-                em: { fontStyle: "italic" },
+                heading1: { fontSize: 21, fontWeight: 'bold', color: colors.text, marginBottom: 8 },
+                heading2: { fontSize: 19, fontWeight: 'bold', color: colors.text, marginBottom: 6 },
+                heading3: { fontSize: 17, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
+                strong: { fontWeight: 'bold' },
+                em: { fontStyle: 'italic' },
                 paragraph: { marginTop: 0, marginBottom: 8 },
                 list_item: { marginBottom: 4 },
                 bullet_list: { marginLeft: 0 },
@@ -115,12 +91,7 @@ export default function MessageBubble({
         </View>
 
         {isLastInGroup && !!time && (
-          <Text
-            style={[
-              styles.timeText,
-              isUser ? styles.timeTextUser : styles.timeTextBot,
-            ]}
-          >
+          <Text style={[styles.timeText, isUser ? styles.timeTextUser : styles.timeTextBot]}>
             {time}
           </Text>
         )}
@@ -134,82 +105,50 @@ export default function MessageBubble({
             !isLastInGroup && styles.avatarHidden,
           ]}
         >
-          {isLastInGroup && <User color="#000" size={18} strokeWidth={2.2} />}
+          {isLastInGroup && <User color={colors.text} size={18} strokeWidth={2.2} />}
         </View>
       )}
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  messageRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-  },
-  userRow: {
-    justifyContent: "flex-end",
-  },
-  botRow: {
-    justifyContent: "flex-start",
-  },
-
-  /* Avatares */
-  avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-    boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.12)",
-  },
-  avatarHidden: {
-    backgroundColor: "transparent",
-    boxShadow: "none",
-  },
-  userAvatarPlaceholder: {
-    backgroundColor: COLORS.userAvatarBg,
-    marginRight: 0,
-    marginLeft: 8,
-  },
-
-  /* Burbujas */
-  messageBubble: {
-    padding: 14,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.08)",
-  },
-  userBubble: {
-    backgroundColor: COLORS.primary,
-  },
-  botBubble: {
-    backgroundColor: COLORS.surface,
-  },
-
-  messageText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  userText: {
-    color: "#ffffff",
-  },
-  botText: {
-    color: COLORS.text,
-  },
-
-  timeText: {
-    fontSize: 11,
-    color: COLORS.placeholder,
-    marginTop: 4,
-  },
-  timeTextUser: {
-    textAlign: "right",
-    marginRight: 4,
-  },
-  timeTextBot: {
-    textAlign: "left",
-    marginLeft: 4,
-  },
-});
+function createStyles(
+  colors: ReturnType<typeof useAppTheme>['colors'],
+  isDark: boolean,
+) {
+  return StyleSheet.create({
+    messageRow: { flexDirection: 'row', alignItems: 'flex-end' },
+    userRow: { justifyContent: 'flex-end' },
+    botRow: { justifyContent: 'flex-start' },
+    avatarPlaceholder: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 8,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.16)',
+    },
+    avatarHidden: { backgroundColor: 'transparent', boxShadow: 'none' },
+    userAvatarPlaceholder: {
+      backgroundColor: isDark ? '#334155' : '#E2E8F0',
+      marginRight: 0,
+      marginLeft: 8,
+    },
+    messageBubble: {
+      padding: 13,
+      paddingHorizontal: 15,
+      borderRadius: 20,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.10)',
+    },
+    userBubble: { backgroundColor: colors.primary },
+    botBubble: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+    messageText: { fontSize: 15.5, lineHeight: 22 },
+    userText: { color: '#FFFFFF' },
+    botText: { color: colors.text },
+    timeText: { fontSize: 10.5, color: colors.muted, marginTop: 4 },
+    timeTextUser: { textAlign: 'right', marginRight: 4 },
+    timeTextBot: { textAlign: 'left', marginLeft: 4 },
+  });
+}

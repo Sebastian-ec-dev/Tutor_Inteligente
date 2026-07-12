@@ -1,6 +1,6 @@
 import { UpdateProfileInput, UserProfile } from '../entities/Profile';
 
 export interface ProfileRepositoryPort {
-  getCurrentProfile(): Promise<UserProfile>;
-  updateProfile(input: UpdateProfileInput): Promise<UserProfile>;
+  getCurrentProfile(userId: string): Promise<UserProfile>;
+  updateProfile(userId: string, input: UpdateProfileInput): Promise<UserProfile>;
 }

@@ -41,11 +41,13 @@ exception
 end $$;
 
 -- Función para unirse por token. Reemplaza versiones antiguas si existían.
+drop function if exists public.join_subject_by_invite_token(text);
+
 create or replace function public.join_subject_by_invite_token(p_token text)
 returns table (
-  subject_id uuid,
-  joined_role text,
-  message text
+  r_subject_id uuid,
+  r_joined_role text,
+  r_message text
 )
 language plpgsql
 security definer

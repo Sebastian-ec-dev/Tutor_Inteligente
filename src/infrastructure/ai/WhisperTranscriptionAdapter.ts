@@ -1,69 +1,90 @@
-import { TranscriptionPort } from '../../domain/ports/TranscriptionPort';
-import { buildTranscriptionPrompt } from '../../application/promptBuilders';
+import { TranscriptionInput, TranscriptionPort } from '../../domain/ports/TranscriptionPort';
 import { env } from '../../shared/config/env';
 
-export class WhisperTranscriptionAdapter implements TranscriptionPort {
-  readonly name = 'OpenAI Whisper / transcriptor de audio';
+const TRANSCRIPTION_TIMEOUT_MS = 120_000;
 
-  async transcribeAudio(input: { base64Audio: string; mimeType: string }): Promise<string> {
+export class WhisperTranscriptionAdapter implements TranscriptionPort {
+  readonly name = 'OpenAI gpt-4o-mini-transcribe';
+
+  async transcribeAudio(input: TranscriptionInput): Promise<string> {
     if (!env.openAIApiKey) {
-      throw new Error('Falta configurar la clave de OpenAI para transcribir audio.');
+      throw new Error('Falta EXPO_PUBLIC_OPENAI_API_KEY para transcribir el audio con OpenAI.');
     }
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TRANSCRIPTION_TIMEOUT_MS);
+
     try {
-      // Implementación compatible para prototipo con Responses API usando audio base64.
-      // En producción se recomienda mover esta llamada a un backend seguro.
-      const response = await fetch('https://api.openai.com/v1/responses', {
+      const formData = new FormData();
+      const fileName = input.fileName || buildAudioFileName(input.mimeType);
+
+      formData.append('file', {
+        uri: input.audioUri,
+        name: fileName,
+        type: normalizeMimeType(input.mimeType),
+      } as any);
+      formData.append('model', env.openAITranscriptionModel);
+      formData.append('language', 'es');
+      formData.append('response_format', 'json');
+      formData.append('temperature', '0');
+      formData.append(
+        'prompt',
+        'Clase académica en español. Transcribe con puntuación clara y conserva términos técnicos, nombres de asignaturas, fórmulas y consignas de tareas.',
+      );
+
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${env.openAIApiKey}`,
-          'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
-        body: JSON.stringify({
-          model: env.openAITranscriptionModel,
-          input: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'input_text',
-                  text: buildTranscriptionPrompt(),
-                },
-                {
-                  type: 'input_audio',
-                  input_audio: {
-                    data: input.base64Audio,
-                    format: input.mimeType.includes('mpeg') || input.mimeType.includes('mp3') ? 'mp3' : 'wav',
-                  },
-                },
-              ],
-            },
-          ],
-        }),
+        body: formData,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const details = await response.text();
+        throw new Error(buildOpenAIError(response.status, details));
       }
 
       const data = await response.json();
-      if (typeof data.output_text === 'string' && data.output_text.trim()) {
-        return data.output_text;
+      if (typeof data.text === 'string' && data.text.trim()) {
+        return data.text.trim();
       }
 
-      const content = data.output?.flatMap((item: any) => item.content || []) || [];
-      const textParts = content.reduce((acc: string[], item: any) => {
-        if (item.type === 'output_text' || item.type === 'text') {
-          acc.push(item.text || '');
-        }
-        return acc;
-      }, []).join('\n');
-
-      if (textParts.trim()) return textParts;
-      throw new Error('La respuesta de transcripción no devolvió texto.');
+      throw new Error('OpenAI no devolvió texto para esta grabación.');
     } catch (error: any) {
-      const message = error?.message || String(error);
-      throw new Error(`No se pudo transcribir el audio con OpenAI: ${message}`);
+      if (error?.name === 'AbortError') {
+        throw new Error(
+          'La transcripción superó el tiempo de espera. Prueba con una grabación más corta o una conexión más estable.',
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
   }
+}
+
+function normalizeMimeType(mimeType: string): string {
+  if (mimeType.includes('mp3') || mimeType.includes('mpeg')) return 'audio/mpeg';
+  if (mimeType.includes('wav')) return 'audio/wav';
+  if (mimeType.includes('webm')) return 'audio/webm';
+  if (mimeType.includes('ogg')) return 'audio/ogg';
+  return 'audio/mp4';
+}
+
+function buildAudioFileName(mimeType: string): string {
+  if (mimeType.includes('mp3') || mimeType.includes('mpeg')) return 'clase.mp3';
+  if (mimeType.includes('wav')) return 'clase.wav';
+  if (mimeType.includes('webm')) return 'clase.webm';
+  if (mimeType.includes('ogg')) return 'clase.ogg';
+  return 'clase.m4a';
+}
+
+function buildOpenAIError(status: number, details: string): string {
+  if (status === 401) return 'La clave de OpenAI no es válida o no tiene acceso.';
+  if (status === 413) return 'El audio es demasiado grande para transcribirlo en una sola solicitud.';
+  if (status === 429) return 'OpenAI alcanzó el límite temporal de solicitudes o saldo.';
+  return `OpenAI no pudo transcribir el audio (${status}). ${details.slice(0, 220)}`;
 }

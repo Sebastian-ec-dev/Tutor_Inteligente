@@ -9,8 +9,8 @@ export class UpdateProfileUseCase {
   ) {}
 
   async execute(input: UpdateProfileInput): Promise<UserProfile> {
-    await this.authRepository.getCurrentUserId();
-    return this.profileRepository.updateProfile({
+    const userId = await this.authRepository.getCurrentUserId();
+    return this.profileRepository.updateProfile(userId, {
       displayName: input.displayName?.trim() || undefined,
       university: input.university?.trim() || undefined,
     });

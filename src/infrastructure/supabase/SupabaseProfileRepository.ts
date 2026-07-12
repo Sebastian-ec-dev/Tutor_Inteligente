@@ -14,24 +14,15 @@ function mapProfile(row: any): UserProfile {
   };
 }
 
-async function getAuthenticatedUser() {
-  const { data: userData, error } = await supabase.auth.getUser();
-  if (error) throw new Error(error.message);
-
-  const user = userData.user;
-  if (!user) throw new Error('No estás autenticado');
-
-  return user;
-}
-
 export class SupabaseProfileRepository implements ProfileRepositoryPort {
-  async getCurrentProfile(): Promise<UserProfile> {
-    const user = await getAuthenticatedUser();
+  async getCurrentProfile(userId: string): Promise<UserProfile> {
+    const { data: userData } = await supabase.auth.getUser();
+    const email = userData.user?.email || null;
 
     const { data, error } = await supabase
       .from('profiles')
       .select(PROFILE_SELECT)
-      .eq('id', user.id)
+      .eq('id', userId)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
@@ -39,10 +30,9 @@ export class SupabaseProfileRepository implements ProfileRepositoryPort {
     if (!data) {
       const { data: inserted, error: insertError } = await supabase
         .from('profiles')
-        .insert({ email: user.email || null })
+        .insert({ id: userId, email })
         .select(PROFILE_SELECT)
         .single();
-
       if (insertError) throw new Error(insertError.message);
       return mapProfile(inserted);
     }
@@ -50,32 +40,22 @@ export class SupabaseProfileRepository implements ProfileRepositoryPort {
     return mapProfile(data);
   }
 
-  async updateProfile(input: UpdateProfileInput): Promise<UserProfile> {
-    const user = await getAuthenticatedUser();
-
-    const payload = {
-      email: user.email || null,
-      display_name: input.displayName || null,
-      university: input.university || null,
-    };
+  async updateProfile(userId: string, input: UpdateProfileInput): Promise<UserProfile> {
+    const { data: userData } = await supabase.auth.getUser();
+    const email = userData.user?.email || null;
 
     const { data, error } = await supabase
       .from('profiles')
-      .update(payload)
-      .eq('id', user.id)
-      .select(PROFILE_SELECT)
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    if (data) return mapProfile(data);
-
-    const { data: inserted, error: insertError } = await supabase
-      .from('profiles')
-      .insert(payload)
+      .upsert({
+        id: userId,
+        email,
+        display_name: input.displayName || null,
+        university: input.university || null,
+      })
       .select(PROFILE_SELECT)
       .single();
 
-    if (insertError) throw new Error(insertError.message);
-    return mapProfile(inserted);
+    if (error) throw new Error(error.message);
+    return mapProfile(data);
   }
 }

@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthSession } from '../domain/entities/AuthSession';
 import { getSessionUseCase, observeAuthStateUseCase } from '../application/container';
-import { ThemeProvider, useAppTheme } from '../components/ui/ThemeContext';
+import { useAppTheme } from '../components/ui/ThemeContext';
 
 import LoginScreen from '../screens/LoginScreen';
-import HomeDashboardScreen from '../screens/HomeDashboardScreen';
 import HomeScreen from '../screens/HomeScreen';
+import SubjectsScreen from '../screens/SubjectsScreen';
+import ScheduleScreen from '../screens/ScheduleScreen';
 import ResumenScreen from '../screens/ResumenScreen';
 import AudioScreen from '../screens/AudioScreen';
 import ChatbotScreen from '../screens/ChatbotScreen';
@@ -19,40 +20,42 @@ import JoinSubjectScreen from '../screens/JoinSubjectScreen';
 export type PropsList = {
   Login: undefined;
   Home: { showTutorial?: boolean } | undefined;
-  Materias: undefined;
-  Resumen: { subjectId: string; subjectName: string };
-  Audio: { subjectId: string; audioNoteId?: string; audioNoteTitle?: string };
-  Chatbot: { subjectId?: string; subjectName?: string; classId?: string; className?: string } | undefined;
+  Subjects: undefined;
+  Schedule: undefined;
+  Resumen: {
+    subjectId: string;
+    subjectName: string;
+    focusAudioNoteId?: string;
+    focusTaskId?: string;
+    initialTab?: 'apuntes' | 'deberes';
+  };
+  Audio:
+    | {
+        subjectId?: string;
+        audioNoteId?: string;
+        audioNoteTitle?: string;
+        quickRecord?: boolean;
+      }
+    | undefined;
+  Chatbot:
+    | { subjectId?: string; subjectName?: string; classId?: string; className?: string }
+    | undefined;
   Profile: undefined;
   Members: { subjectId: string; subjectName: string };
   JoinSubject: undefined;
 };
 
 const Stack = createNativeStackNavigator<PropsList>();
-const MIN_SPLASH_MS = 3000;
+const MIN_SPLASH_MS = 3200;
 
-function AppNavigatorInner() {
-  const appTheme = useAppTheme();
-
+export default function AppNavigator() {
+  const { colors } = useAppTheme();
   const [session, setSession] = useState<AuthSession>(null);
   const [splashDone, setSplashDone] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
 
-  const navigationTheme = {
-    ...(appTheme.isDark ? DarkTheme : DefaultTheme),
-    colors: {
-      ...(appTheme.isDark ? DarkTheme : DefaultTheme).colors,
-      background: appTheme.colors.background,
-      card: appTheme.colors.surface,
-      text: appTheme.colors.text,
-      border: appTheme.colors.border,
-      primary: appTheme.colors.primary,
-    },
-  };
-
   useEffect(() => {
     let mounted = true;
-
     const timer = setTimeout(() => {
       if (mounted) setSplashDone(true);
     }, MIN_SPLASH_MS);
@@ -78,72 +81,65 @@ function AppNavigatorInner() {
     };
   }, []);
 
+  if (!splashDone || !sessionChecked) return <SplashScreen />;
+
   return (
-    <NavigationContainer theme={navigationTheme}>
-      {!splashDone || !sessionChecked ? (
-        <SplashScreen />
-      ) : (
-        <Stack.Navigator>
-          {session?.user ? (
-            <>
-              <Stack.Screen
-                name="Home"
-                component={HomeDashboardScreen}
-                options={{ title: 'Home' }}
-              />
-              <Stack.Screen
-                name="Materias"
-                component={HomeScreen}
-                options={{ title: 'Materias' }}
-              />
-              <Stack.Screen
-                name="Resumen"
-                component={ResumenScreen}
-                options={({ route }) => ({ title: route.params.subjectName })}
-              />
-              <Stack.Screen
-                name="Audio"
-                component={AudioScreen}
-                options={{ title: 'Nuevo Apunte' }}
-              />
-              <Stack.Screen
-                name="Chatbot"
-                component={ChatbotScreen}
-                options={{ title: 'Tutor IA' }}
-              />
-              <Stack.Screen
-                name="Profile"
-                component={ProfileScreen}
-                options={{ title: 'Mi perfil' }}
-              />
-              <Stack.Screen
-                name="Members"
-                component={MembersScreen}
-                options={({ route }) => ({ title: `Integrantes · ${route.params.subjectName}` })}
-              />
-              <Stack.Screen
-                name="JoinSubject"
-                component={JoinSubjectScreen}
-                options={{ title: 'Unirme a materia' }}
-              />
-            </>
-          ) : (
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerShadowVisible: false,
+          headerTitleStyle: { fontWeight: '900' },
+          headerTintColor: colors.text,
+          headerStyle: { backgroundColor: colors.background },
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        {session?.user ? (
+          <>
             <Stack.Screen
-              name="Login"
-              component={LoginScreen}
+              name="Home"
+              component={HomeScreen}
               options={{ headerShown: false }}
             />
-          )}
-        </Stack.Navigator>
-      )}
+            <Stack.Screen
+              name="Subjects"
+              component={SubjectsScreen}
+              options={{ title: 'Mis materias' }}
+            />
+            <Stack.Screen
+              name="Schedule"
+              component={ScheduleScreen}
+              options={{ title: 'Horario de clases' }}
+            />
+            <Stack.Screen
+              name="Resumen"
+              component={ResumenScreen}
+              options={({ route }) => ({ title: route.params.subjectName })}
+            />
+            <Stack.Screen
+              name="Audio"
+              component={AudioScreen}
+              options={({ route }) => ({
+                title: route.params?.quickRecord ? 'Grabar clase' : 'Nuevo apunte',
+              })}
+            />
+            <Stack.Screen name="Chatbot" component={ChatbotScreen} options={{ title: 'Tutor IA' }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Mi perfil' }} />
+            <Stack.Screen
+              name="Members"
+              component={MembersScreen}
+              options={({ route }) => ({ title: `Integrantes · ${route.params.subjectName}` })}
+            />
+            <Stack.Screen
+              name="JoinSubject"
+              component={JoinSubjectScreen}
+              options={{ title: 'Unirme a materia' }}
+            />
+          </>
+        ) : (
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
-  );
-}
-
-export default function AppNavigator() {
-  return (
-    <ThemeProvider>
-      <AppNavigatorInner />
-    </ThemeProvider>
   );
 }

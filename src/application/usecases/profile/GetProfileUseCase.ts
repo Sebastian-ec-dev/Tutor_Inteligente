@@ -9,7 +9,7 @@ export class GetProfileUseCase {
   ) {}
 
   async execute(): Promise<UserProfile> {
-    await this.authRepository.getCurrentUserId();
-    return this.profileRepository.getCurrentProfile();
+    const userId = await this.authRepository.getCurrentUserId();
+    return this.profileRepository.getCurrentProfile(userId);
   }
 }

@@ -37,10 +37,9 @@ export class SupabaseSubjectRepository implements SubjectRepositoryPort {
       return (ownData || []).map(mapSubject);
     }
 
-    const joinedSubjects = (memberData || []).flatMap((row: any) => {
-      const subject = Array.isArray(row.subjects) ? row.subjects[0] : row.subjects;
-      return subject ? [subject] : [];
-    });
+    const joinedSubjects = (memberData || [])
+      .map((row: any) => (Array.isArray(row.subjects) ? row.subjects[0] : row.subjects))
+      .filter(Boolean);
 
     const byId = new Map<string, Subject>();
     [...(ownData || []), ...joinedSubjects].forEach((row) => {
@@ -61,6 +60,7 @@ export class SupabaseSubjectRepository implements SubjectRepositoryPort {
       .insert([
         {
           name: input.name,
+          user_id: input.userId,
           teacher: input.teacher || null,
           description: input.description || null,
           color: input.color || '#2563EB',
