@@ -37,6 +37,7 @@ import {
 import LoadingModal from '../components/ui/LoadingModal';
 import AppBottomBar from '../components/ui/AppBottomBar';
 import { useAppTheme } from '../components/ui/ThemeContext';
+import { getPickerItemColor } from '../components/ui/pickerColors';
 import MultiDayScheduleFields, {
   DayScheduleDraft,
 } from '../components/schedule/MultiDayScheduleFields';
@@ -53,6 +54,7 @@ const NEW_SUBJECT = '__new_subject__';
 export default function ScheduleScreen() {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const pickerItemColor = getPickerItemColor(isDark, colors.text);
   const [entries, setEntries] = useState<ClassSchedule[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -316,10 +318,10 @@ export default function ScheduleScreen() {
                   dropdownIconColor={colors.text}
                 >
                   {subjects.map((subject) => (
-                    <Picker.Item key={subject.id} label={subject.name} value={subject.id} color={colors.text} />
+                    <Picker.Item key={subject.id} label={subject.name} value={subject.id} color={pickerItemColor} />
                   ))}
                   {!editing && (
-                    <Picker.Item label="Crear una nueva materia" value={NEW_SUBJECT} color={colors.text} />
+                    <Picker.Item label="Crear una nueva materia" value={NEW_SUBJECT} color={pickerItemColor} />
                   )}
                 </Picker>
               </View>

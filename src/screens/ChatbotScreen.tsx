@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -56,6 +55,7 @@ import { chatSessionRepository } from '../infrastructure/supabase/SupabaseChatSe
 import { supabase } from '../infrastructure/supabase/supabaseClient';
 import { PropsList } from '../navigation/AppNavigator';
 import { useAppTheme } from '../components/ui/ThemeContext';
+import { getPickerItemColor } from '../components/ui/pickerColors';
 
 const ALL_SUBJECTS = '__all_subjects__';
 
@@ -120,7 +120,6 @@ export default function ChatbotScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -161,11 +160,11 @@ export default function ChatbotScreen() {
   );
 
   useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated: true }));
+    });
     return () => {
       showSub.remove();
-      hideSub.remove();
     };
   }, []);
 
@@ -699,17 +698,16 @@ export default function ChatbotScreen() {
         </Text>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.chatArea}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 82 : 0}
-      >
+      <View style={styles.chatArea}>
         <FlatList
           ref={flatListRef}
+          style={styles.messageScroll}
           data={messages}
           keyExtractor={(item, index) => item.id || `${item.sender}_${index}`}
           contentContainerStyle={styles.messageList}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           renderItem={({ item, index }) => {
             const next = messages[index + 1];
             const isLastInGroup = !next || next.sender !== item.sender;
@@ -746,6 +744,8 @@ export default function ChatbotScreen() {
               multiline
               maxLength={1000}
               editable={!loading}
+              selectionColor={colors.primary}
+              onFocus={() => requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated: true }))}
             />
             <Pressable
               style={[styles.sendButton, ((!inputText.trim() && !pendingAttachment) || loading) && styles.sendButtonDisabled]}
@@ -756,9 +756,8 @@ export default function ChatbotScreen() {
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
-      {!keyboardVisible && <AppBottomBar activeTab="Chatbot" />}
       {renderModals()}
     </View>
   );
@@ -834,8 +833,9 @@ function ChatConfigModal({
   onClose: () => void;
   onSave: () => void;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const pickerItemColor = getPickerItemColor(isDark, colors.text);
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalBackdrop}>
@@ -853,16 +853,16 @@ function ChatConfigModal({
           <Text style={styles.fieldLabel}>1. Materia</Text>
           <View style={styles.pickerWrapper}>
             <Picker selectedValue={subjectId} onValueChange={onChangeSubject} style={{ color: colors.text }} dropdownIconColor={colors.text}>
-              {!subjects.length && <Picker.Item label="No hay materias" value="" color={colors.text} />}
-              {subjects.map((subject) => <Picker.Item key={subject.id} label={subject.name} value={subject.id} color={colors.text} />)}
+              {!subjects.length && <Picker.Item label="No hay materias" value="" color={pickerItemColor} />}
+              {subjects.map((subject) => <Picker.Item key={subject.id} label={subject.name} value={subject.id} color={pickerItemColor} />)}
             </Picker>
           </View>
 
           <Text style={styles.fieldLabel}>2. Clase o audio procesado</Text>
           <View style={styles.pickerWrapper}>
             <Picker selectedValue={classId} onValueChange={onChangeClass} style={{ color: colors.text }} dropdownIconColor={colors.text}>
-              {!classes.length && <Picker.Item label="No hay clases procesadas" value="" color={colors.text} />}
-              {classes.map((item) => <Picker.Item key={item.id} label={item.title} value={item.id} color={colors.text} />)}
+              {!classes.length && <Picker.Item label="No hay clases procesadas" value="" color={pickerItemColor} />}
+              {classes.map((item) => <Picker.Item key={item.id} label={item.title} value={item.id} color={pickerItemColor} />)}
             </Picker>
           </View>
 
@@ -992,7 +992,7 @@ function RenameChatModal({
 
 function createStyles(colors: ReturnType<typeof useAppTheme>['colors']) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.background },
+    screen: { flex: 1, minHeight: 0, backgroundColor: colors.background },
     listHeader: { paddingHorizontal: 17, paddingTop: 8, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     listTitle: { color: colors.text, fontSize: 26, fontWeight: '900' },
     listSubtitle: { color: colors.muted, fontSize: 11.5, marginTop: 3 },
@@ -1035,9 +1035,10 @@ function createStyles(colors: ReturnType<typeof useAppTheme>['colors']) {
     topSubtitle: { color: colors.muted, fontSize: 10.5, marginTop: 2 },
     contextStrip: { minHeight: 38, backgroundColor: colors.soft, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
     contextStripText: { color: colors.muted, fontSize: 10.5, fontWeight: '800' },
-    chatArea: { flex: 1 },
+    chatArea: { flex: 1, minHeight: 0 },
+    messageScroll: { flex: 1, minHeight: 0 },
     messageList: { flexGrow: 1, paddingHorizontal: 12, paddingTop: 15, paddingBottom: 12 },
-    inputArea: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
+    inputArea: { flexShrink: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
     attachmentChip: { minHeight: 40, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.primarySoft, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 8, marginBottom: 7 },
     attachmentName: { flex: 1, color: colors.text, fontSize: 11.5, fontWeight: '800' },
     inputRow: { minHeight: 54, borderRadius: 27, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.input, flexDirection: 'row', alignItems: 'flex-end', padding: 3, gap: 3 },

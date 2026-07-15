@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { Bot, User } from 'lucide-react-native';
 import formateoTime from './formateoTime';
@@ -20,6 +20,43 @@ export default function MessageBubble({
 }) {
   const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const codeColors = useMemo(
+    () => ({
+      background: isDark ? '#0B1220' : '#F1F5F9',
+      border: isDark ? '#475569' : '#CBD5E1',
+      text: isDark ? '#E2E8F0' : '#0F172A',
+    }),
+    [isDark],
+  );
+  const monospaceFont = Platform.select({
+    ios: 'Courier',
+    android: 'monospace',
+    default: 'monospace',
+  });
+  const markdownRules = useMemo(() => {
+    const renderCodeBlock = (node: { key: string; content?: string }) => {
+      const content =
+        typeof node.content === 'string' ? node.content.replace(/\n$/, '') : '';
+
+      return (
+        <View key={node.key} style={styles.markdownCodeBlock}>
+          <Text selectable style={styles.markdownCodeBlockText}>
+            {content}
+          </Text>
+        </View>
+      );
+    };
+
+    return {
+      code_inline: (node: { key: string; content?: string }) => (
+        <Text key={node.key} selectable style={styles.markdownInlineCode}>
+          {node.content ?? ''}
+        </Text>
+      ),
+      code_block: renderCodeBlock,
+      fence: renderCodeBlock,
+    };
+  }, [styles]);
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(10)).current;
 
@@ -72,6 +109,7 @@ export default function MessageBubble({
             <Text style={[styles.messageText, styles.userText]}>{item.text}</Text>
           ) : (
             <Markdown
+              rules={markdownRules}
               style={{
                 body: { ...styles.messageText, ...styles.botText },
                 heading1: { fontSize: 21, fontWeight: 'bold', color: colors.text, marginBottom: 8 },
@@ -83,6 +121,36 @@ export default function MessageBubble({
                 list_item: { marginBottom: 4 },
                 bullet_list: { marginLeft: 0 },
                 ordered_list: { marginLeft: 0 },
+                code_inline: {
+                  color: codeColors.text,
+                  backgroundColor: codeColors.background,
+                  borderColor: codeColors.border,
+                  borderWidth: 1,
+                  borderRadius: 5,
+                  paddingHorizontal: 5,
+                  paddingVertical: 2,
+                  fontFamily: monospaceFont,
+                },
+                code_block: {
+                  color: codeColors.text,
+                  backgroundColor: codeColors.background,
+                  borderColor: codeColors.border,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  padding: 12,
+                  marginVertical: 8,
+                  fontFamily: monospaceFont,
+                },
+                fence: {
+                  color: codeColors.text,
+                  backgroundColor: codeColors.background,
+                  borderColor: codeColors.border,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  padding: 12,
+                  marginVertical: 8,
+                  fontFamily: monospaceFont,
+                },
               }}
             >
               {item.text}
@@ -147,6 +215,40 @@ function createStyles(
     messageText: { fontSize: 15.5, lineHeight: 22 },
     userText: { color: '#FFFFFF' },
     botText: { color: colors.text },
+    markdownInlineCode: {
+      color: isDark ? '#E2E8F0' : '#0F172A',
+      backgroundColor: isDark ? '#0B1220' : '#F1F5F9',
+      borderColor: isDark ? '#475569' : '#CBD5E1',
+      borderWidth: 1,
+      borderRadius: 5,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      fontFamily: Platform.select({
+        ios: 'Courier',
+        android: 'monospace',
+        default: 'monospace',
+      }),
+    },
+    markdownCodeBlock: {
+      alignSelf: 'stretch',
+      backgroundColor: isDark ? '#0B1220' : '#F1F5F9',
+      borderColor: isDark ? '#475569' : '#CBD5E1',
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      marginVertical: 8,
+    },
+    markdownCodeBlockText: {
+      color: isDark ? '#E2E8F0' : '#0F172A',
+      backgroundColor: 'transparent',
+      fontFamily: Platform.select({
+        ios: 'Courier',
+        android: 'monospace',
+        default: 'monospace',
+      }),
+      fontSize: 14,
+      lineHeight: 20,
+    },
     timeText: { fontSize: 10.5, color: colors.muted, marginTop: 4 },
     timeTextUser: { textAlign: 'right', marginRight: 4 },
     timeTextBot: { textAlign: 'left', marginLeft: 4 },

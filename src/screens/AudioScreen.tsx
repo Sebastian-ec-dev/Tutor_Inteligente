@@ -48,6 +48,7 @@ import {
 import LoadingModal from '../components/ui/LoadingModal';
 import AppBottomBar from '../components/ui/AppBottomBar';
 import { useAppTheme } from '../components/ui/ThemeContext';
+import { getPickerItemColor } from '../components/ui/pickerColors';
 
 const CONTENT_TYPES: ClassContentType[] = ['theory', 'math', 'image', 'general'];
 
@@ -86,8 +87,9 @@ function formatTime(totalSeconds: number): string {
 }
 
 export default function AudioScreen() {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const pickerItemColor = getPickerItemColor(isDark, colors.text);
   const route = useRoute<RouteProp<PropsList, 'Audio'>>();
   const navigation = useNavigation<NativeStackNavigationProp<PropsList>>();
   const params = route.params || {};
@@ -621,9 +623,9 @@ export default function AudioScreen() {
                   style={{ color: colors.text }}
                   dropdownIconColor={colors.text}
                 >
-                  <Picker.Item label="Seleccione una materia" value="" color={colors.text} />
+                  <Picker.Item label="Seleccione una materia" value="" color={pickerItemColor} />
                   {subjects.map((subject) => (
-                    <Picker.Item key={subject.id} label={subject.name} value={subject.id} color={colors.text} />
+                    <Picker.Item key={subject.id} label={subject.name} value={subject.id} color={pickerItemColor} />
                   ))}
                 </Picker>
               </View>
@@ -693,7 +695,7 @@ export default function AudioScreen() {
                   dropdownIconColor={colors.text}
                 >
                   {CONTENT_TYPES.map((type) => (
-                    <Picker.Item key={type} label={CLASS_CONTENT_LABELS[type]} value={type} color={colors.text} />
+                    <Picker.Item key={type} label={CLASS_CONTENT_LABELS[type]} value={type} color={pickerItemColor} />
                   ))}
                 </Picker>
               </View>
